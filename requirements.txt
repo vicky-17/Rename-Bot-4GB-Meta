@@ -1,11 +1,14 @@
 pyrofork==2.3.68
-tgcrypto
 pyromod
 humanize
 pymongo
 Pillow
 hachoir
+TgCrypto
 dnspython
 Flask
 gunicorn
 aiohttp
+ffmpeg
+langdetect
+git+https://github.com/openai/whisper.git

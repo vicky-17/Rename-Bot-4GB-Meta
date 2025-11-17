@@ -6,7 +6,11 @@ from PIL import Image
 from hachoir.metadata import extractMetadata
 from hachoir.parser import createParser
 
-
+import json
+import subprocess
+# from .geminiAI import get_metadata_from_gemini
+from config import LOG_CHANNEL
+from .ai_language_detector import ai_detect_audio_language
 
 async def fix_thumb(thumb):
     width = 0
@@ -76,8 +80,8 @@ async def add_metadata(input_path, output_path, metadata, ms):
         stdout, stderr = await process.communicate()
         e_response = stderr.decode().strip()
         t_response = stdout.decode().strip()
-        print(e_response)
-        print(t_response)
+        # print(e_response)
+        # print(t_response)
 
         
         if os.path.exists(output_path):
@@ -92,3 +96,96 @@ async def add_metadata(input_path, output_path, metadata, ms):
         return None
     
 
+
+
+
+
+
+async def ai_rename_file(bot, file_path, file_name):
+    try:
+        print(f"📌 Checking available audio tracks in: {file_path}")
+        print("The Fil Name ::",file_name)
+
+        AI_FILES_DIR = os.path.join(os.path.dirname(os.path.dirname(__file__)), "AI_Files")
+        os.makedirs(AI_FILES_DIR, exist_ok=True)  # ensure folder exists
+
+        base_name = os.path.splitext(os.path.basename(file_path))[0]
+        print("This is the base Name :: ",base_name)
+
+
+        # Step 1: probe all streams
+        cmd_probe = [
+            "ffprobe", "-v", "error",
+            "-show_entries", "stream=index,codec_type",
+            "-of", "csv=p=0",
+            file_path
+        ]
+        proc = await asyncio.create_subprocess_exec(
+            *cmd_probe, stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.PIPE
+        )
+        stdout, _ = await proc.communicate()
+
+        streams = []
+        for line in stdout.decode().splitlines():
+            index, codec_type = line.strip().split(",")
+            if codec_type == "audio":
+                streams.append(int(index))
+
+        print(f"🎧 Audio streams found: {streams}")
+
+        extracted_files = []
+
+        # Step 2: extract each audio stream
+        for i, stream_index in enumerate(streams):
+            temp_file = f"{base_name}_audio{i}.aac"
+
+            # Extract short segment for language detection
+            command = [
+                "ffmpeg", "-y",
+                "-i", file_path,
+                "-ss", "00:05:00",      # start at 10 min
+                "-t", "00:10:00",       # 2-minute clip
+                "-map", f"0:a:{i}",
+                "-c:a", "aac",
+                temp_file
+            ]
+            proc = await asyncio.create_subprocess_exec(
+                *command, stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.PIPE
+            )
+            await proc.communicate()
+
+            if not os.path.exists(temp_file):
+                print(f"❌ Failed audio stream {i}")
+                continue
+
+            # Step 3: detect language
+            detected_language = await ai_detect_audio_language(temp_file)
+            print(f"🌐 Stream {i} detected language: {detected_language}")
+
+            # Step 4: append detected language to file name
+            name, ext = os.path.splitext(file_name)
+            file_name = f"{name}_{detected_language}{ext}"
+            print(f"📝 Updated file name: {file_name}")
+
+            # # Step 5: rename & move to AI_Files folder
+            # output_file = os.path.join(AI_FILES_DIR, f"{base_name}_audio{i}_{detected_language}.aac")
+            # os.rename(temp_file, output_file)
+            # extracted_files.append(output_file)
+
+            # # Step 6: send to log channel
+            # await bot.send_document(
+            #     LOG_CHANNEL,
+            #     output_file,
+            #     caption=f"🎵 Audio Stream {i} ({detected_language}) – 10:00–12:00"
+            # )
+            # print(f"✅ Extracted audio stream {i} → {output_file}")
+
+            # Step 7: cleanup temp files (if any remain)
+            if os.path.exists(temp_file):
+                os.remove(temp_file)
+
+        return file_name
+
+    except Exception as e:
+        print("❌ Error at audio extractor :: ", e)
+        return file_name

@@ -23,19 +23,23 @@ async def refunc(client, message):
             new_name = new_name + "." + extn
         await reply_message.delete()
 
-        button = [
-            [InlineKeyboardButton("📁 𝗗𝗼𝗰𝘂𝗺𝗲𝗻𝘁",callback_data = "upload_document")]
-        ]
+        button = []
 
         if file.media in [MessageMediaType.VIDEO, MessageMediaType.DOCUMENT]:
-            button.append([
-                InlineKeyboardButton("🎥 𝗩𝗶𝗱𝗲𝗼", callback_data = "upload_video")
-            ])
+            button.append(
+                [
+                    InlineKeyboardButton("📁 𝗗𝗼𝗰𝘂𝗺𝗲𝗻𝘁",callback_data = "upload_document"),
+                    InlineKeyboardButton("🎥 𝗩𝗶𝗱𝗲𝗼", callback_data = "upload_video")
+                ]
+            )
         elif file.media == MessageMediaType.AUDIO:
-            button.append([
-                InlineKeyboardButton("🎵 𝗔𝘂𝗱𝗶𝗼", callback_data = "upload_audio")
-            ])
-        button.append(
+            button.append(
+                [
+                    InlineKeyboardButton("📁 𝗗𝗼𝗰𝘂𝗺𝗲𝗻𝘁",callback_data = "upload_document"),
+                    InlineKeyboardButton("🎵 𝗔𝘂𝗱𝗶𝗼", callback_data = "upload_audio")
+                ]
+            )
+        button.extend([
             [
                 InlineKeyboardButton("🖼 𝗗𝗼𝘄𝗻𝗹𝗼𝗮𝗱 𝗧𝗵𝘂𝗺𝗯", callback_data="getthumb"),
                 InlineKeyboardButton("🖼  𝗗𝗼𝘄𝗻𝗹𝗼𝗮𝗱 𝗖𝗼𝘃𝗲𝗿", callback_data="getcover")
@@ -43,11 +47,59 @@ async def refunc(client, message):
             [
                 InlineKeyboardButton("✖️ 𝗖𝗮𝗻𝗰𝗲𝗹", callback_data="cancel")
             ]
-        )
+        ])
+
 
         await message.reply(
             text=f"**Select The Output File Type**\n\n**File Name :-** `{new_name}`",
             reply_to_message_id=file.id,
             reply_markup=InlineKeyboardMarkup(button)
         )
+
+
+@Client.on_callback_query(filters.regex("^airename$"))
+async def ai_rename(bot, update):
+    print("🤖 AI Renamer Triggered.",update)
+    message = update.message
+    file = message.reply_to_message
+    media = getattr(file, file.media.value)
+
+    # Create a placeholder name tag for AI
+    ai_tag = "File Name will Set by :- AI_Renamer"
+
+    button = []
+    if file.media in [MessageMediaType.VIDEO, MessageMediaType.DOCUMENT]:
+        button.append(
+            [
+                InlineKeyboardButton("📁 𝗗𝗼𝗰𝘂𝗺𝗲𝗻𝘁", callback_data="upload_document"),
+                InlineKeyboardButton("🎥 𝗩𝗶𝗱𝗲𝗼", callback_data="upload_video")
+            ]
+        )
+    elif file.media == MessageMediaType.AUDIO:
+        button.append(
+            [
+                InlineKeyboardButton("📁 𝗗𝗼𝗰𝘂𝗺𝗲𝗻𝘁", callback_data="upload_document"),
+                InlineKeyboardButton("🎵 𝗔𝘂𝗱𝗶𝗼", callback_data="upload_audio")
+            ]
+        )
+
+    button.extend([
+        [
+            InlineKeyboardButton("🖼 𝗗𝗼𝘄𝗻𝗹𝗼𝗮𝗱 𝗧𝗵𝘂𝗺𝗯", callback_data="getthumb"),
+            InlineKeyboardButton("🖼  𝗗𝗼𝘄𝗻𝗹𝗼𝗮𝗱 𝗖𝗼𝘃𝗲𝗿", callback_data="getcover")
+        ],
+        [
+            InlineKeyboardButton("✖️ 𝗖𝗮𝗻𝗰𝗲𝗹", callback_data="cancel")
+        ]
+    ])
+
+    try:
+        await message.delete()
+        await message.reply(
+            text=f"**Select The Output File Type**\n\n**{ai_tag}**",
+            reply_to_message_id=file.id,
+            reply_markup=InlineKeyboardMarkup(button)
+        )
+    except Exception as e:
+        print("Error at ai renamer send msg :",e)
 

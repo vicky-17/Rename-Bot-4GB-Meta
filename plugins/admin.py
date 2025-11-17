@@ -3,7 +3,7 @@ from pyrogram.types import (InlineKeyboardButton, InlineKeyboardMarkup)
 from config import *
 from pyrogram import Client, filters
 from helper.date import add_date
-from helper.database import uploadlimit, usertype, addpre
+from helper.database import uploadlimit, usertype, addpre, find_one
 
 
 
@@ -24,6 +24,47 @@ async def warn(c, m):
 
 @Client.on_message(filters.private & filters.user(ADMIN) & filters.command(["addpremium"]))
 async def buypremium(bot, message):
+    print("📌Add premium Command.", message)
+    # Split by spaces (all parts)
+    parts = message.text.strip().split()
+    print(f"Parts lenth {len(parts)} :: \n {parts}")
+
+    if len(parts) < 2:
+        await message.reply_text(
+            "⚠️ Please provide a user ID.\nExample: `/addpremium 6216066502`"
+        )
+        return
+    elif len(parts) > 2:
+        await message.reply_text(
+            "⚠️ Please provide One user ID at a time.\nExample: `/addpremium 6216066502`"
+        )
+        return
+    else:
+        user_id = parts[1]
+        # Check if it's a valid number
+        if not user_id.isdigit():
+            await message.reply_text(
+                "❌ Invalid user ID format.\nPlease provide only numeric user ID.\nExample: `/addpremium 6216066502`"
+            )
+            return
+    
+    try:
+        user_id = int(parts[1])
+        user_data = find_one(user_id)
+        if user_data:
+            user = await bot.get_users(user_id)
+            print("User fetched successfully:", user.first_name)
+        else:
+            await message.reply_text(
+                "❌ Invalid or unreachable user ID.\n"
+                "This user has not started the bot yet.\n\n"
+                "Ask them to send /start to the bot first."
+            )
+            return
+    except Exception as e:
+        await message.reply_text(f"⚠️ Error checking user ID: `{e}`")
+        return
+
     button = InlineKeyboardMarkup([
         [InlineKeyboardButton("🪙 Basic", callback_data="vip1"),
         InlineKeyboardButton("⚡ Standard", callback_data="vip2")],
@@ -31,7 +72,7 @@ async def buypremium(bot, message):
         [InlineKeyboardButton("✖️ Cancel ✖️",callback_data = "cancel")]
         ])
         
-    await message.reply_text("🦋 Select Plan To Upgrade...", quote=True, reply_markup=button)
+    await message.reply_text(f"🦋 Select Plan To Upgrade...\n For user : [{user.first_name}](tg://user?id={user.id}) ", quote=True, reply_markup=button)
     
     
 
@@ -57,13 +98,15 @@ async def resetpower(bot, message):
     await message.reply_text(text=f"Do You Really Want To Reset Daily Limit To Default Data Limit 2GB ?", quote=True, reply_markup=button)
     
     
-    
 
 # PREMIUM POWER MODE
 @Client.on_callback_query(filters.regex('vip1'))
 async def vip1(bot,update):
+    print("📌 Update at vip1",update)
+
     id = update.message.reply_to_message.text.split("/addpremium")
     user_id = id[1].replace(" ", "")
+    print("User ID ::",user_id)
     inlimit  = 21474836500
     uploadlimit(int(user_id),21474836500)
     usertype(int(user_id),"🪙 Basic")
@@ -101,7 +144,7 @@ async def vip3(bot,update):
 
 
 
-# CEASE POWER MODE
+# CEASE POWER MODE 
 @Client.on_callback_query(filters.regex('cp1'))
 async def cp1(bot,update):
     id = update.message.reply_to_message.text.split("/ceasepower")
@@ -111,7 +154,7 @@ async def cp1(bot,update):
     usertype(int(user_id),"⚠️ Account Downgraded")
     addpre(int(user_id))
     await update.message.edit("Added Successfully To Upload Limit 2GB")
-    await bot.send_message(user_id, f"Hey {update.from_user.mention} \n\nYou Are Downgraded To Cease <b>Limit 2GB</b>. Check Your Plan Here /myplan \n\n<b>Contact Admin :</b> @FIlmyswapAdmin")
+    await bot.send_message(user_id, f"Hey {update.from_user.mention} \n\nYou Are Downgraded To Cease <b>Limit 2GB</b>. Check Your Plan Here /myplan \n\n<b>Contact Admin :</b> @FilmyswapOfficial")
 
 
 
@@ -124,7 +167,7 @@ async def cp2(bot,update):
     usertype(int(user_id),"⚠️ Account Downgraded")
     addpre(int(user_id))
     await update.message.edit("Added Successfully To Upload Limit 0GB")
-    await bot.send_message(user_id, f"Hey {update.from_user.mention} \n\nYou Are Downgraded To Cease <b>Limit 0GB</b>. Check Your Plan Here /myplan \n\n<b>Contact Admin :</b> @FIlmyswapAdmin")
+    await bot.send_message(user_id, f"Hey {update.from_user.mention} \n\nYou Are Downgraded To Cease <b>Limit 0GB</b>. Check Your Plan Here /myplan \n\n<b>Contact Admin :</b> @FilmyswapOfficial")
 
 
 
@@ -139,5 +182,5 @@ async def dft(bot,update):
     usertype(int(user_id),"🆓 Free")
     addpre(int(user_id))
     await update.message.edit("Daily Data Limit Has Been Reset Successfully.\n\nThis Account Has Default 2GB Remaining Capacity")
-    await bot.send_message(user_id, f"Hey {update.from_user.mention} \n\nYour Daily Data Limit Has Been Reset Successfully. Check Your Plan Here /myplan\n\n<b>Contact Admin :</b> @FIlmyswapAdmin")
+    await bot.send_message(user_id, f"Hey {update.from_user.mention} \n\nYour Daily Data Limit Has Been Reset Successfully. Check Your Plan Here /myplan\n\n<b>Contact Admin :</b> @FilmyswapOfficial")
 
