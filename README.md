@@ -32,8 +32,13 @@
 ### 📶 DEPLOYEMENT
 
 ### 🚀 Deploy to Google Colab
+Click a button to deploy the branch you want:
 
-[![Open in Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/vicky-17/Rename-Bot-4GB-Meta/blob/main/Deploy_to_Colab_Rename_Bot.ipynb)
+<p>
+  <a href="https://colab.research.google.com/github/vicky-17/Rename-Bot-4GB-Meta/blob/v1.2-dev/Deploy_to_Colab_Rename_Bot.ipynb">
+    <img src="https://colab.research.google.com/assets/colab-badge.svg" alt="Deploy v1.2-dev"/>
+  </a>
+</p>
 
 <b><details><summary>Tap On Me For Deply To Heroku</summary>
 
