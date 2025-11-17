@@ -34,7 +34,7 @@
 Click a button to deploy the branch you want:
 
 <p>
-  <a href="https://colab.research.google.com/github/vicky-17/YOUR-NEW-SAFE-REPO/blob/main/Deploy_to_Colab_Rename_Bot.ipynb">
+  <a href="https://colab.research.google.com/github/vicky-17/Rename-Bot-4GB-Meta/blob/main/Deploy_to_Colab_Rename_Bot.ipynb">
     <img src="https://colab.research.google.com/assets/colab-badge.svg" alt="Deploy main"/>
   </a>
 </p>
