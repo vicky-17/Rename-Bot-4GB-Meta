@@ -31,6 +31,10 @@
 
 ### 📶 DEPLOYEMENT
 
+### 🚀 Deploy to Google Colab
+
+[![Open in Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/vicky-17/Rename-Bot-4GB-Meta/blob/main/Deploy_to_Colab_Rename_Bot.ipynb)
+
 <b><details><summary>Tap On Me For Deply To Heroku</summary>
 
  - Deploy To Heroku
