@@ -69,7 +69,7 @@ async def process_user_upload(client, message):
             await client.get_chat_member(FORCE_SUBS, user_id)
 
         except UserNotParticipant:
-            _newus = find_one(message.from_user.id)
+            _newus = find_one(user_id)
             user = _newus["usertype"]
 
             await message.reply_text(
@@ -87,20 +87,28 @@ async def process_user_upload(client, message):
                 )
             )
 
-            await client.send_message(
-                LOG_CHANNEL,
-                f"""
-<b><u>New User Started The Bot</u></b>
-
-<b>User ID :</b> <code>{user_id}</code>
-<b>First Name :</b> {message.from_user.first_name}
-<b>Last Name :</b> {message.from_user.last_name}
-<b>User Name :</b> @{message.from_user.username}
-<b>User Mention :</b> {message.from_user.mention}
-<b>User Link :</b> <a href='tg://openmessage?user_id={user_id}'>Click Here</a>
-<b>User Plan :</b> {user}
-                """
-            )
+            # FIX: Only send user details to log channel if it's a real user (not a channel)
+            if message.from_user:
+                await client.send_message(
+                    LOG_CHANNEL,
+                    f"<b><u>New User Started The Bot</u></b>\n\n",
+                    f"<b>User ID :</b> <code>{user_id}</code>",
+                    f"<b>First Name :</b> {message.from_user.first_name}",
+                    f"<b>Last Name :</b> {message.from_user.last_name}",
+                    f"<b>User Name :</b> @{message.from_user.username}",
+                    f"<b>User Mention :</b> {message.from_user.mention}",
+                    f"<b>User Link :</b> <a href='tg://openmessage?user_id={user_id}'>Click Here</a>",
+                    f"<b>User Plan :</b> {user}"
+                )
+            else:
+                # Optional: Log for channels
+                await client.send_message(
+                    LOG_CHANNEL,
+                    f"<b><u>New Channel Started The Bot</u></b>",
+                    f"<b>Channel ID :</b> <code>{user_id}</code>",
+                    f"<b>Channel Title :</b> {message.chat.title}",
+                    f"<b>User Plan :</b> {user}"
+                )
             return
 
     botdata(int(botid))
