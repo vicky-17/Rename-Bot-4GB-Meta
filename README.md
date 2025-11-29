@@ -85,6 +85,7 @@ ping - To Check Bot Ping.
 myplan - To View User Current Plan.
 donate - To Support Developer.
 upgrade - To View All Plans With Price List.
+generate_session - Generate Pyrogram Session
 ```
 </b>
 </details>
