@@ -59,7 +59,10 @@ async def process_user_upload(client, message):
     user_id = message.chat.id
     old = insert(int(user_id))
 
-    user_id = message.from_user.id
+    if message.from_user:
+        user_id = message.from_user.id
+    else:
+        user_id = message.chat.id
 
     if FORCE_SUBS:
         try:

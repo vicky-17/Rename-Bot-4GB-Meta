@@ -201,6 +201,7 @@ async def vid(bot, update):
             filw = await app.send_video(
                 LOG_CHANNEL,
                 video=metadata_path if _bool_metadata else final_path,
+                file_name=new_filename,
                 thumb=ph_path,
                 duration=duration,
                 width=width,
@@ -243,6 +244,7 @@ async def vid(bot, update):
             await bot.send_video(
                 update.from_user.id,
                 video=metadata_path if _bool_metadata else final_path,
+                file_name=new_filename,
                 thumb=ph_path,
                 duration=duration,
                 width=width,
@@ -346,7 +348,15 @@ async def doc(bot, update):
     if value < file.file_size:
         await ms.edit("🚀 Try To Upload...  ⚡")
         try:
-            filw = await app.send_document(LOG_CHANNEL, document=metadata_path if _bool_metadata else final_path, thumb=ph_path, caption=caption, progress=progress_for_pyrogram, progress_args=("🚀 Try To Uploading...  ⚡",  ms, c_time))
+            filw = await app.send_document(
+                LOG_CHANNEL,
+                document=metadata_path if _bool_metadata else final_path,
+                file_name=new_filename,
+                thumb=ph_path,
+                caption=caption,
+                progress=progress_for_pyrogram,
+                progress_args=("🚀 Try To Uploading...  ⚡", ms, c_time)
+            )
             from_chat = filw.chat.id
             mg_id = filw.id
             time.sleep(2)
@@ -375,7 +385,15 @@ async def doc(bot, update):
         await ms.edit("🚀 Try To Upload...  ⚡")
         c_time = time.time()
         try:
-            await bot.send_document(update.from_user.id, document=metadata_path if _bool_metadata else final_path, thumb=ph_path, caption=caption, progress=progress_for_pyrogram, progress_args=("🚀 Try To Uploading...  ⚡",  ms, c_time))
+            await bot.send_document(
+                update.from_user.id,
+                document=metadata_path if _bool_metadata else final_path,
+                file_name=new_filename,
+                thumb=ph_path,
+                caption=caption,
+                progress=progress_for_pyrogram,
+                progress_args=("🚀 Try To Uploading...  ⚡",  ms, c_time)
+            )
             await ms.delete()
             
             os.remove(file_path)
@@ -464,7 +482,16 @@ async def aud(bot, update):
         await ms.edit("🚀 Try To Upload...  ⚡")
         c_time = time.time()
         try:
-            await bot.send_audio(update.message.chat.id, audio=metadata_path if _bool_metadata else final_path, caption=caption, thumb=ph_path, duration=duration, progress=progress_for_pyrogram, progress_args=("🚀 Try To Uploading...  ⚡",  ms, c_time))
+            await bot.send_audio(
+                update.message.chat.id,
+                audio=metadata_path if _bool_metadata else final_path,
+                file_name=new_filename,
+                caption=caption,
+                thumb=ph_path,
+                duration=duration,
+                progress=progress_for_pyrogram,
+                progress_args=("🚀 Try To Uploading...  ⚡",  ms, c_time)
+            )
             await ms.delete()
             
             os.remove(file_path)
@@ -482,7 +509,15 @@ async def aud(bot, update):
         await ms.edit("🚀 Try To Upload...  ⚡")
         c_time = time.time()
         try:
-            await bot.send_audio(update.message.chat.id, audio=metadata_path if _bool_metadata else final_path, caption=caption, duration=duration, progress=progress_for_pyrogram, progress_args=("🚀 Try To Uploading...  ⚡",  ms, c_time))
+            await bot.send_audio(
+                update.message.chat.id,
+                audio=metadata_path if _bool_metadata else final_path,
+                file_name=new_filename,
+                caption=caption,
+                duration=duration,
+                progress=progress_for_pyrogram,
+                progress_args=("🚀 Try To Uploading...  ⚡",  ms, c_time)
+            )
             await ms.delete()
             
             os.remove(file_path)
