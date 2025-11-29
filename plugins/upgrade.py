@@ -24,13 +24,13 @@ Daily Upload limit 100GB
 Price Rs 179  ind /🌎 2.16$  per Month
 
 Payment Details :-
-<b>➜ UPI ID :</b> <code>madflixofficial@axl</code>
-<b>➜ QR Code :</b> <a href='https://telegra.ph/QR-Payment-07-24-4'>Click Here</a>
+<b>➜ UPI ID :</b> <code>upi@axl</code>
+<b>➜ QR Code :</b> <a href='https://telegra.ph/'>Click Here</a>
 
 After Payment Send Screenshots Of Payment To Admin @FilmyswapAdmin"""
     
     keybord = InlineKeyboardMarkup([
-        [InlineKeyboardButton("🦋 Admin", url = "https://t.me/calladminrobot"),
+        [InlineKeyboardButton("🦋 Admin", url = "https://t.me/ContactFilmyswapBot"),
         InlineKeyboardButton("✖️ Cancel", callback_data="cancel")]
         ])
     
@@ -57,14 +57,14 @@ Daily Upload limit 100GB
 Price Rs 179  ind /🌎 2.16$  per Month
 
 Payment Details :-
-<b>➜ UPI ID :</b> <code>madflixofficial@axl</code>
+<b>➜ UPI ID :</b> <code>upi@axl</code>
 <b>➜ PayPal :</b> <a href='https://www.paypal.me/'>Click Here</a>
-<b>➜ QR Code :</b> <a href='https://telegra.ph/QR-Payment-07-24-4'>Click Here</a>
+<b>➜ QR Code :</b> <a href='https://telegra.ph/'>Click Here</a>
 
 After Payment Send Screenshots Of Payment To Admin @FilmyswapAdmin"""
     
     keybord = InlineKeyboardMarkup([
-        [InlineKeyboardButton("🦋 Admin", url = "https://t.me/calladminrobot"),
+        [InlineKeyboardButton("🦋 Admin", url = "https://t.me/ContactFilmyswapBot"),
         InlineKeyboardButton("✖️ Cancel", callback_data="cancel")]
         ])
     
