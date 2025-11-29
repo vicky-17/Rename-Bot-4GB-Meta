@@ -22,7 +22,7 @@ LOG_CHANNEL = int(os.environ.get("LOG_CHANNEL", ""))
 
 # Mongo DB Database Config
 DATABASE_URL = os.environ.get("DATABASE_URL", "")
-DATABASE_NAME = os.environ.get("DATABASE_NAME", "")
+DATABASE_NAME = "renameBot"
 
 # Other Variables Config
 START_PIC = os.environ.get("START_PIC", "")
