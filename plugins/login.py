@@ -1,7 +1,6 @@
 # Ultra-Forward-Bot-main\plugins\login.py
 from pyrogram import Client, filters
 from pyrogram.errors import SessionPasswordNeeded, PhoneCodeInvalid, PasswordHashInvalid, PhoneNumberInvalid, ApiIdInvalid, ApiIdPublishedFlood
-from config import Config
 import asyncio
 import os
 
