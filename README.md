@@ -85,7 +85,6 @@ ping - To Check Bot Ping.
 myplan - To View User Current Plan.
 donate - To Support Developer.
 upgrade - To View All Plans With Price List.
-generate_session - Generate Pyrogram Session
 ```
 </b>
 </details>
@@ -97,6 +96,7 @@ generate_session - Generate Pyrogram Session
 <b><details><summary>Tap On Me For Admin Commands</summary>
 
 ```
+generate_session - Generate Pyrogram Session [Admins Only].
 users - Use This Command To See Total Users [Admins Only].
 allids - Use This Command To See All Users IDs List [Admins Only].
 broadcast - Message Broadcast Command [Admins Only].

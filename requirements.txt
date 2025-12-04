@@ -1,4 +1,5 @@
 pyrofork==2.3.68
+python-dotenv
 pyromod
 humanize
 pymongo
@@ -11,4 +12,4 @@ gunicorn
 aiohttp
 ffmpeg
 langdetect
-git+https://github.com/openai/whisper.git
+faster-whisper

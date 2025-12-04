@@ -1,11 +1,15 @@
 # config.py
 import os
+from dotenv import load_dotenv
+
 
 #add this two buildpack to heroku in settings serially
 
 # https://github.com/jonathanong/heroku-buildpack-ffmpeg-latest
 # heroku/python
 
+# Load variables from .env file
+load_dotenv()
 
 # Required Variables Config
 API_ID = int(os.environ.get("API_ID", ""))

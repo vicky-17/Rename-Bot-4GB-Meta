@@ -59,7 +59,7 @@ async def refunc(client, message):
 
 @Client.on_callback_query(filters.regex("^airename$"))
 async def ai_rename(bot, update):
-    print("🤖 AI Renamer Triggered.",update)
+    print("🤖 AI Renamer Triggered :: ",update.message.reply_to_message.video.file_name or update)
     message = update.message
     file = message.reply_to_message
     media = getattr(file, file.media.value)

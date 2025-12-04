@@ -9,7 +9,14 @@ from helper.database import *
 import os, random, time, asyncio, humanize
 from PIL import Image
 from datetime import timedelta
-from helper.ffmpeg import take_screen_shot, fix_thumb, add_metadata, ai_rename_file
+from helper.ffmpeg import (
+    take_screen_shot,
+    fix_thumb,
+    add_metadata,
+    ai_rename_file,
+    detect_languages_first_10_percent  # ⬅️ new
+)
+
 from helper.progress import humanbytes
 from helper.set import escape_invalid_curly_brackets
 from config import *
@@ -84,7 +91,11 @@ async def vid(bot, update):
     used_limit(update.from_user.id, total_used)
 
     try:
-        path = await bot.download_media(message=file, progress=progress_for_pyrogram, progress_args=("🚀 Try To Downloading...  ⚡",  ms, c_time))
+        path = await bot.download_media(
+            message=file,
+            progress=progress_for_pyrogram,
+            progress_args=("🚀 Try To Downloading...  ⚡",  ms, c_time)
+        )
 
     except Exception as e:
         neg_used = used - int(file.file_size)
@@ -528,3 +539,57 @@ async def aud(bot, update):
             used_limit(update.from_user.id, neg_used)
             os.remove(file_path)
 
+
+
+@Client.on_callback_query(filters.regex("detect_language"))
+async def detect_language_handler(bot, update):
+    """
+    Simple language detection:
+    - Download only the first ~10% of the file.
+    - Extract a short audio clip from EACH audio track.
+    - Detect language via ai_detect_audio_language().
+    - Show download & detection time via progress edits.
+    """
+    message = update.message.reply_to_message
+    if not message:
+        await update.message.edit("<b>❌ Reply-to message not found.</b>")
+        return
+
+    file = message.document or message.video or message.audio
+    if not file:
+        await update.message.edit("<b>❌ No media found in replied message.</b>")
+        return
+
+    # Initial status
+    ms = await update.message.edit(
+        "<b>🎧 Preparing to download first 10% & detect languages...</b>"
+    )
+
+    overall_start = time.time()
+
+    try:
+        lang_results = await detect_languages_first_10_percent(
+            bot,        # client
+            message,    # original message with media
+            ms=ms,
+            clip_seconds=30       # 30s per track is enough
+        )
+    except Exception as e:
+        print(f"❌ detect_language_handler error: {e}")
+        await ms.edit("<b>❌ Error while detecting language.</b>")
+        return
+
+    if not lang_results:
+        await ms.edit("<b>❌ No audio streams or language could be detected.</b>")
+        return
+
+    total_elapsed = int(time.time() - overall_start)
+
+    # Build result text
+    lines = ["<b>✅ Language detection complete (first 10% of file):</b>", ""]
+    for idx, lang in lang_results.items():
+        lines.append(f"▫️ <b>Audio Track {idx + 1}:</b> {lang}")
+
+    lines.append(f"\n⏱ <b>Total time:</b> {total_elapsed}s")
+
+    await ms.edit("\n".join(lines))
