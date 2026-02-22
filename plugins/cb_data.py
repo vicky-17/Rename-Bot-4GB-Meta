@@ -20,6 +20,7 @@ from helper.ffmpeg import (
 from helper.progress import humanbytes
 from helper.set import escape_invalid_curly_brackets
 from config import *
+from helper.media_scanner import extract_media_info
 
 
 
@@ -541,8 +542,8 @@ async def aud(bot, update):
 
 
 
-@Client.on_callback_query(filters.regex("detect_language"))
-async def detect_language_handler(bot, update):
+@Client.on_callback_query(filters.regex("ai_detect_language"))
+async def ai_detect_language_handler(bot, update):
     """
     Simple language detection:
     - Download only the first ~10% of the file.
@@ -593,3 +594,54 @@ async def detect_language_handler(bot, update):
     lines.append(f"\n⏱ <b>Total time:</b> {total_elapsed}s")
 
     await ms.edit("\n".join(lines))
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+@Client.on_callback_query(filters.regex("^detect_language$"))
+async def detect_language_callback(bot, update):
+    print("🌐 [Callback] 'detect_language' triggered.")
+    
+    # Get the original message containing the media
+    message = update.message.reply_to_message 
+    
+    if not message:
+        print("❌ [Callback] Error: Original message with media not found.")
+        await update.message.reply_text("❌ Could not find the original message with the media file.")
+        return
+
+    print("📤 [Callback] Notifying user that scan is starting...")
+    # Optional: Send a temporary new message to show progress so the user knows it's working
+    temp_msg = await update.message.reply_text("📡 **Starting media scan... Fetching file headers...**")
+    
+    try:
+        print("🔄 [Callback] Calling extract_media_info...")
+        
+        # Get the result from the helper file
+        result_text = await extract_media_info(bot, message)
+        
+        print("📤 [Callback] Sending final scan result as a new message.")
+        # Send the final result as a NEW message
+        await update.message.reply_text(result_text)
+        
+    except Exception as e:
+        print(f"❌ [Callback] Unexpected error: {e}")
+        await update.message.reply_text(f"❌ An unexpected error occurred: {e}")
+        
+    finally:
+        # Delete the temporary progress message
+        await temp_msg.delete()
+        # Acknowledge the callback so the button stops loading
+        await update.answer()

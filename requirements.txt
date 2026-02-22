@@ -13,3 +13,4 @@ aiohttp
 ffmpeg
 langdetect
 faster-whisper
+pymediainfo

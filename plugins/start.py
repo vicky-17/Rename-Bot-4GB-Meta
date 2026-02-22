@@ -226,7 +226,7 @@ __What Do You Want Me To Do With This File ?__
                             [
                                 [
                                     InlineKeyboardButton("🤖 AI Rᴇɴᴀᴍᴇ", callback_data = "airename"),
-                                    InlineKeyboardButton("🌐 AI Lᴀɴɢ Dᴇᴛᴇᴄᴛ", callback_data = "detect_language")
+                                    InlineKeyboardButton("🌐 AI Lᴀɴɢ Dᴇᴛᴇᴄᴛ", callback_data = "ai_detect_language")
                                 ],
                                 [
                                     InlineKeyboardButton("📝 𝐌𝐚𝐧𝐮𝐚𝐥 𝗥𝗲𝗻𝗮𝗺𝗲", callback_data="rename"),
@@ -237,6 +237,7 @@ __What Do You Want Me To Do With This File ?__
                                     InlineKeyboardButton("🖼  𝗗𝗼𝘄𝗻𝗹𝗼𝗮𝗱 𝗖𝗼𝘃𝗲𝗿", callback_data="getcover")
                                 ],
                                 [
+                                    InlineKeyboardButton("🌐 Lᴀɴɢ Dᴇᴛᴇᴄᴛ", callback_data = "detect_language"),
                                     InlineKeyboardButton("✖️ 𝗖𝗮𝗻𝗰𝗲𝗹", callback_data="cancel")
                                 ]
                             ]
@@ -299,7 +300,7 @@ __What Do You Want Me To Do With This File ?__
                     [
                         [
                             InlineKeyboardButton("🤖 AI Rᴇɴᴀᴍᴇ", callback_data = "airename"),
-                            InlineKeyboardButton("🌐 AI Lᴀɴɢ Dᴇᴛᴇᴄᴛ", callback_data = "detect_language")
+                            InlineKeyboardButton("🌐 AI Lᴀɴɢ Dᴇᴛᴇᴄᴛ", callback_data = "ai_detect_language")
                         ],
                         [
                             InlineKeyboardButton("📝 𝐌𝐚𝐧𝐮𝐚𝐥 𝗥𝗲𝗻𝗮𝗺𝗲", callback_data="rename"),
