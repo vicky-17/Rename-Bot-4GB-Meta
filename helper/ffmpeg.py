@@ -463,7 +463,7 @@ async def detect_languages_first_10_percent(
             except Exception:
                 pass
 
-        return results
+        return lang
 
     except Exception as e:
         print(f"❌ Error in detect_languages_first_10_percent: {e}")
