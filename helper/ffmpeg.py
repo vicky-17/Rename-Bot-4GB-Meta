@@ -400,13 +400,20 @@ async def detect_languages_first_10_percent(
                     continue
 
                 # Detect language for this 30s sample
-                lang = await ai_detect_audio_language(sample_path)
-                lang = lang or "Unknown"
-                print(f"🌐 Track {audio_pos} @ {offset}s -> {lang}")
+                detection_result = await ai_detect_audio_language(sample_path)
+                
+                # Safely unpack the tuple (language_name, probability_score)
+                if isinstance(detection_result, tuple) and len(detection_result) == 2:
+                    lang_name, score = detection_result
+                else:
+                    lang_name, score = "Unknown", 0.0
+                
+                print(f"🌐 Track {audio_pos} @ {offset}s -> {lang_name} (Score: {score})")
 
                 # Treat non-Unknown as a successful detection
-                if lang != "Unknown":
-                    langs_for_track.append(lang)
+                if lang_name != "Unknown":
+                    # Store BOTH the name and the score so we can compare them later
+                    langs_for_track.append((lang_name, score))
 
                 # Cleanup sample
                 try:
@@ -418,16 +425,17 @@ async def detect_languages_first_10_percent(
                 if len(langs_for_track) >= 5:
                     break
 
-            # Decide final language for this track
+            # Decide final language for this track based on HIGHEST SCORE
             if not langs_for_track:
                 final_lang = "Unknown"
             else:
-                from collections import Counter
-                counts = Counter(langs_for_track)
-                final_lang = counts.most_common(1)[0][0]
+                # Find the tuple with the highest score (the second item in the tuple)
+                best_match = max(langs_for_track, key=lambda item: item[1])
+                final_lang = best_match[0]  # Extract JUST the string name (e.g., "Hindi")
+                best_score = best_match[1]
 
             results[audio_pos] = final_lang
-            print(f"✅ Final language for track {audio_pos}: {final_lang} (votes={langs_for_track})")
+            print(f"✅ Final language for track {audio_pos}: {final_lang} (Highest Score: {best_score if langs_for_track else 0})")
 
             # Progress update per track
             if ms:
@@ -442,7 +450,7 @@ async def detect_languages_first_10_percent(
                 except Exception:
                     pass
 
-            print(f"🌐 Final language for track {audio_pos}: {lang}")
+            print(f"🌐 Final language for track {audio_pos}: {final_lang}")
 
             # Progress update per track
             if ms:
@@ -451,7 +459,7 @@ async def detect_languages_first_10_percent(
                     await ms.edit(
                         f"<b>🎧 Detecting languages from first 10%...</b>\n\n"
                         f"Tracks analyzed: <b>{audio_pos + 1}/{total_tracks}</b>\n"
-                        f"Last track: <b>{lang}</b>\n"
+                        f"Last track: <b>{final_lang}</b>\n"
                         f"⏱ Elapsed: <b>{elapsed}s</b>"
                     )
                 except Exception:
@@ -463,7 +471,7 @@ async def detect_languages_first_10_percent(
             except Exception:
                 pass
 
-        return lang
+        return results
 
     except Exception as e:
         print(f"❌ Error in detect_languages_first_10_percent: {e}")
