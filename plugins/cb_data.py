@@ -14,7 +14,8 @@ from helper.ffmpeg import (
     fix_thumb,
     add_metadata,
     ai_rename_file,
-    detect_languages_first_10_percent  # ⬅️ new
+    detect_languages_first_10_percent,
+    detect_languages_by_smart_sampling
 )
 
 from helper.progress import humanbytes
@@ -569,11 +570,10 @@ async def ai_detect_language_handler(bot, update):
     overall_start = time.time()
 
     try:
-        lang_results = await detect_languages_first_10_percent(
+        lang_results = await detect_languages_by_smart_sampling(
             bot,        # client
             message,    # original message with media
-            ms=ms,
-            clip_seconds=30       # 30s per track is enough
+            ms=ms
         )
     except Exception as e:
         print(f"❌ detect_language_handler error: {e}")

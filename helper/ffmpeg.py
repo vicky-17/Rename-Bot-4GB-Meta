@@ -114,26 +114,12 @@ async def ai_rename_file(bot, file_path, file_name):
         base_name = os.path.splitext(os.path.basename(file_path))[0]
         print("This is the base Name :: ",base_name)
 
-
-        # Step 1: probe all streams
-        cmd_probe = [
-            "ffprobe", "-v", "error",
-            "-show_entries", "stream=index,codec_type",
-            "-of", "csv=p=0",
-            file_path
-        ]
-        proc = await asyncio.create_subprocess_exec(
-            *cmd_probe, stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.PIPE
-        )
-        stdout, _ = await proc.communicate()
-
-        streams = []
-        for line in stdout.decode().splitlines():
-            index, codec_type = line.strip().split(",")
-            if codec_type == "audio":
-                streams.append(int(index))
+        # Step 1: get streams using helper
+        media_streams = await get_media_streams(file_path)
+        streams = media_streams["audio"]
 
         print(f"🎧 Audio streams found: {streams}")
+
 
         extracted_files = []
 
@@ -196,10 +182,114 @@ async def ai_rename_file(bot, file_path, file_name):
 
 
 
+async def get_media_streams(file_path: str) -> dict:
+    """
+    Detect all streams in media file.
+    Returns dict with audio, video, subtitle indexes.
+    """
+    cmd_probe = [
+        "ffprobe", "-v", "error",
+        "-show_entries", "stream=index,codec_type",
+        "-of", "csv=p=0",
+        file_path
+    ]
+
+    proc = await asyncio.create_subprocess_exec(
+        *cmd_probe,
+        stdout=asyncio.subprocess.PIPE,
+        stderr=asyncio.subprocess.PIPE
+    )
+    stdout, _ = await proc.communicate()
+
+    streams = {
+        "audio": [],
+        "video": [],
+        "subtitle": []
+    }
+
+    for line in stdout.decode().splitlines():
+        try:
+            index, codec_type = line.strip().split(",")
+            if codec_type in streams:
+                streams[codec_type].append(int(index))
+        except ValueError:
+            continue
+
+    return streams
 
 
 
-# --- PARTIAL DOWNLOAD & DETECTION ---
+# ms = message to edit for progress
+async def detect_languages_by_smart_sampling(client, message, ms=None):
+    metadata = await extract_media_metadata(message)
+
+
+
+
+
+
+async def extract_media_metadata(message):
+    """
+    Detect media type and extract basic metadata.
+
+    Returns:
+        dict or None
+    """
+
+    media = message.video or message.document or message.audio
+
+    if not media:
+        print("❌ No supported media found.")
+        return None
+
+    # Detect media type
+    if message.video:
+        media_type = "video"
+    elif message.document:
+        media_type = "document"
+    elif message.audio:
+        media_type = "audio"
+    else:
+        media_type = "unknown"
+
+    file_size = getattr(media, "file_size", None)
+    duration = getattr(media, "duration", None)
+    file_name = getattr(media, "file_name", None)
+
+    print(f"📦 Media Type: {media_type}")
+    print(f"📁 File Name: {file_name}")
+    print(f"📏 File Size: {file_size}")
+    print(f"⏱ Duration (Telegram): {duration}")
+
+    return {
+        "media": media,
+        "media_type": media_type,
+        "file_size": file_size,
+        "duration": duration,
+        "file_name": file_name
+    }
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 # --- SIMPLE 10% PARTIAL DOWNLOAD & LANGUAGE DETECTION ---
 
@@ -207,7 +297,6 @@ async def detect_languages_first_10_percent(
     client,
     message,
     ms=None,              # message to edit for progress (optional)
-    clip_seconds: int = 30
 ):
     """
     Simple strategy:
@@ -221,6 +310,9 @@ async def detect_languages_first_10_percent(
     Returns:
         dict[int, str] -> {audio_track_index: language_name}
     """
+
+    clip_seconds = 30
+
     temp_dir = "downloads"
     os.makedirs(temp_dir, exist_ok=True)
 
@@ -483,3 +575,8 @@ async def detect_languages_first_10_percent(
                 os.remove(partial_file)
             except Exception:
                 pass
+
+
+
+
+
