@@ -545,13 +545,6 @@ async def aud(bot, update):
 
 @Client.on_callback_query(filters.regex("ai_detect_language"))
 async def ai_detect_language_handler(bot, update):
-    """
-    Simple language detection:
-    - Download only the first ~10% of the file.
-    - Extract a short audio clip from EACH audio track.
-    - Detect language via ai_detect_audio_language().
-    - Show download & detection time via progress edits.
-    """
     message = update.message.reply_to_message
     if not message:
         await update.message.edit("<b>❌ Reply-to message not found.</b>")
