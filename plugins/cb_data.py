@@ -2,7 +2,7 @@
 import os
 from helper.progress import progress_for_pyrogram
 from pyrogram import Client, filters
-from pyrogram.types import (InlineKeyboardButton, InlineKeyboardMarkup, ForceReply)
+from pyrogram.types import (InlineKeyboardButton, InlineKeyboardMarkup, ForceReply, CallbackQuery)
 from hachoir.metadata import extractMetadata
 from hachoir.parser import createParser
 from helper.database import *
