@@ -244,8 +244,8 @@ async def probe_media_with_ffprobe(client, message, temp_dir="downloads"):
         cmd = [
             "ffprobe",
             "-v", "error",
-            "-select_streams", "a,s",
-            "-show_entries", "stream=index,codec_type:stream_tags=language",
+            "-show_entries",
+            "stream=index,codec_type:stream_tags=language",
             "-of", "json",
             temp_path
         ]
