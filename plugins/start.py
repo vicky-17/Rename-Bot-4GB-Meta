@@ -225,19 +225,21 @@ __What Do You Want Me To Do With This File ?__
                         reply_markup=InlineKeyboardMarkup(
                             [
                                 [
+                                    InlineKeyboardButton("📝 𝐌𝐚𝐧𝐮𝐚𝐥 𝗥𝗲𝗻𝗮𝗺𝗲", callback_data="rename"),
                                     InlineKeyboardButton("🤖 AI Rᴇɴᴀᴍᴇ", callback_data = "airename"),
-                                    InlineKeyboardButton("🌐 AI Lᴀɴɢ Dᴇᴛᴇᴄᴛ", callback_data = "ai_detect_language")
+                                    
                                 ],
                                 [
-                                    InlineKeyboardButton("📝 𝐌𝐚𝐧𝐮𝐚𝐥 𝗥𝗲𝗻𝗮𝗺𝗲", callback_data="rename"),
-                                    InlineKeyboardButton("{..} 𝗝𝘀𝗼𝗻𝗱𝘂𝗺𝗽", callback_data="jsondump")
+                                    InlineKeyboardButton("🌐 Lᴀɴɢ Dᴇᴛᴇᴄᴛ", callback_data = "detect_language"),
+                                    InlineKeyboardButton("🌐 AI Lᴀɴɢ Dᴇᴛᴇᴄᴛ", callback_data = "ai_detect_language")
                                 ],
                                 [
                                     InlineKeyboardButton("🖼  𝗗𝗼𝘄𝗻𝗹𝗼𝗮𝗱 𝗧𝗵𝘂𝗺𝗯", callback_data="getthumb"),
                                     InlineKeyboardButton("🖼  𝗗𝗼𝘄𝗻𝗹𝗼𝗮𝗱 𝗖𝗼𝘃𝗲𝗿", callback_data="getcover")
                                 ],
                                 [
-                                    InlineKeyboardButton("🌐 Lᴀɴɢ Dᴇᴛᴇᴄᴛ", callback_data = "detect_language"),
+                                    
+                                    InlineKeyboardButton("{..} 𝗝𝘀𝗼𝗻𝗱𝘂𝗺𝗽", callback_data="jsondump"),
                                     InlineKeyboardButton("✖️ 𝗖𝗮𝗻𝗰𝗲𝗹", callback_data="cancel")
                                 ]
                             ]
@@ -299,19 +301,21 @@ __What Do You Want Me To Do With This File ?__
                 reply_markup=InlineKeyboardMarkup(
                     [
                         [
+                            InlineKeyboardButton("📝 𝐌𝐚𝐧𝐮𝐚𝐥 𝗥𝗲𝗻𝗮𝗺𝗲", callback_data="rename"),
                             InlineKeyboardButton("🤖 AI Rᴇɴᴀᴍᴇ", callback_data = "airename"),
-                            InlineKeyboardButton("🌐 AI Lᴀɴɢ Dᴇᴛᴇᴄᴛ", callback_data = "ai_detect_language")
+                            
                         ],
                         [
-                            InlineKeyboardButton("📝 𝐌𝐚𝐧𝐮𝐚𝐥 𝗥𝗲𝗻𝗮𝗺𝗲", callback_data="rename"),
-                            InlineKeyboardButton("{..} 𝗝𝘀𝗼𝗻𝗱𝘂𝗺𝗽", callback_data="jsondump")
+                            InlineKeyboardButton("🌐 Lᴀɴɢ Dᴇᴛᴇᴄᴛ", callback_data = "detect_language"),
+                            InlineKeyboardButton("🌐 AI Lᴀɴɢ Dᴇᴛᴇᴄᴛ", callback_data = "ai_detect_language")
                         ],
                         [
                             InlineKeyboardButton("🖼  𝗗𝗼𝘄𝗻𝗹𝗼𝗮𝗱 𝗧𝗵𝘂𝗺𝗯", callback_data="getthumb"),
                             InlineKeyboardButton("🖼  𝗗𝗼𝘄𝗻𝗹𝗼𝗮𝗱 𝗖𝗼𝘃𝗲𝗿", callback_data="getcover")
                         ],
                         [
-                            InlineKeyboardButton("🌐 Lᴀɴɢ Dᴇᴛᴇᴄᴛ", callback_data = "detect_language"),
+                            
+                            InlineKeyboardButton("{..} 𝗝𝘀𝗼𝗻𝗱𝘂𝗺𝗽", callback_data="jsondump"),
                             InlineKeyboardButton("✖️ 𝗖𝗮𝗻𝗰𝗲𝗹", callback_data="cancel")
                         ]
                     ]

@@ -10,7 +10,7 @@ async def extract_media_info(client, message):
         return "❌ No media found to scan."
 
     # 5MB chunk is usually enough for MKV/MP4 headers
-    CHUNK_LIMIT = 5 * 1024 * 1024 
+    CHUNK_LIMIT = 2 * 1024 * 1024 
     downloaded = 0
     temp_fd, temp_path = tempfile.mkstemp(suffix=".mkv")
     
