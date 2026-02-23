@@ -221,19 +221,16 @@ async def get_media_streams(file_path: str) -> dict:
 
 # ms = message to edit for progress
 async def detect_languages_by_smart_sampling(client, message, ms=None):
-    metadata = await extract_media_metadata(message)
+    metadata = await extract_media_metadata(client, message)
 
 
 
 
 
-
-async def extract_media_metadata(message):
+async def extract_media_metadata(client, message):
     """
-    Detect media type and extract basic metadata.
-
-    Returns:
-        dict or None
+    Detect media type and extract metadata.
+    If duration missing → probe header using ffprobe.
     """
 
     media = message.video or message.document or message.audio
@@ -242,7 +239,6 @@ async def extract_media_metadata(message):
         print("❌ No supported media found.")
         return None
 
-    # Detect media type
     if message.video:
         media_type = "video"
     elif message.document:
@@ -255,18 +251,36 @@ async def extract_media_metadata(message):
     file_size = getattr(media, "file_size", None)
     duration = getattr(media, "duration", None)
     file_name = getattr(media, "file_name", None)
+    mime_type = getattr(media, "mime_type", None)
+
+
+    ffprobe_data = None
+    # If duration missing → probe header
+    if not duration:
+        print("⚠️ Duration missing. Probing header...")
+        ffprobe_data = await probe_media_with_ffprobe(client, message)
+
+        if ffprobe_data:
+            try:
+                duration = float(ffprobe_data["format"]["duration"])
+                print(f"🎬 Duration from ffprobe: {duration}")
+            except:
+                duration = None
 
     print(f"📦 Media Type: {media_type}")
     print(f"📁 File Name: {file_name}")
     print(f"📏 File Size: {file_size}")
     print(f"⏱ Duration (Telegram): {duration}")
 
+
     return {
         "media": media,
         "media_type": media_type,
         "file_size": file_size,
         "duration": duration,
-        "file_name": file_name
+        "file_name": file_name,
+        "mime_type": mime_type,
+        "ffprobe_data": ffprobe_data
     }
 
 
@@ -274,7 +288,70 @@ async def extract_media_metadata(message):
 
 
 
+async def probe_media_with_ffprobe(client, message, temp_dir="downloads"):
+    """
+    Download small header chunk and extract full media info using ffprobe.
 
+    Returns:
+        dict or None
+    """
+
+    os.makedirs(temp_dir, exist_ok=True)
+    temp_path = os.path.join(temp_dir, f"probe_{message.id}.mkv")
+
+    CHUNK_LIMIT = 5 * 1024 * 1024  # 5MB header is enough
+    downloaded = 0
+
+    try:
+        # Download header only
+        with open(temp_path, "wb") as f:
+            async for chunk in client.stream_media(message, limit=CHUNK_LIMIT):
+                f.write(chunk)
+                downloaded += len(chunk)
+                if downloaded >= CHUNK_LIMIT:
+                    break
+
+        if not os.path.exists(temp_path):
+            print("❌ Header download failed.")
+            return None
+
+        # Run ffprobe in JSON mode
+        cmd = [
+            "ffprobe",
+            "-v", "error",
+            "-print_format", "json",
+            "-show_format",
+            "-show_streams",
+            temp_path
+        ]
+
+        proc = await asyncio.create_subprocess_exec(
+            *cmd,
+            stdout=asyncio.subprocess.PIPE,
+            stderr=asyncio.subprocess.PIPE
+        )
+
+        stdout, stderr = await proc.communicate()
+
+        if not stdout:
+            print("❌ ffprobe returned no output.")
+            return None
+
+        probe_data = json.loads(stdout.decode())
+
+        print("✅ ffprobe probe successful.")
+        return probe_data
+
+    except Exception as e:
+        print(f"❌ ffprobe error: {e}")
+        return None
+
+    finally:
+        if os.path.exists(temp_path):
+            try:
+                os.remove(temp_path)
+            except:
+                pass
 
 
 
