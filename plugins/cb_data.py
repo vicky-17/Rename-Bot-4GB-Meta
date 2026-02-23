@@ -15,7 +15,7 @@ from helper.ffmpeg import (
     add_metadata,
     ai_rename_file,
     detect_languages_first_10_percent,
-    detect_languages_by_smart_sampling
+    smart_language_detection
 )
 
 from helper.progress import humanbytes
@@ -563,7 +563,7 @@ async def ai_detect_language_handler(bot, update):
     overall_start = time.time()
 
     try:
-        lang_results = await detect_languages_by_smart_sampling(
+        lang_results = await smart_language_detection(
             bot,        # client
             message,    # original message with media
             ms=ms

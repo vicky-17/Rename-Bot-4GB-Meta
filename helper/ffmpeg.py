@@ -2,6 +2,9 @@
 import time
 import os
 import asyncio
+
+from collections import defaultdict
+
 from PIL import Image
 from hachoir.metadata import extractMetadata
 from hachoir.parser import createParser
@@ -217,15 +220,185 @@ async def get_media_streams(file_path: str) -> dict:
 
     return streams
 
+async def extract_audio_from_partial(partial_file, track_index):
+    """
+    Extract 30 sec audio from streamed partial.
+    """
 
+    output_file = partial_file.replace(".mkv", f"_a{track_index}.aac")
 
-# ms = message to edit for progress
-async def detect_languages_by_smart_sampling(client, message, ms=None):
+    cmd = [
+        "ffmpeg", "-y",
+        "-i", partial_file,
+        "-map", f"0:a:{track_index}",
+        "-t", "30",
+        "-c:a", "aac",
+        output_file
+    ]
+
+    proc = await asyncio.create_subprocess_exec(
+        *cmd,
+        stdout=asyncio.subprocess.PIPE,
+        stderr=asyncio.subprocess.PIPE
+    )
+
+    await proc.communicate()
+
+    if os.path.exists(output_file) and os.path.getsize(output_file) > 1000:
+        return output_file
+
+    return None
+
+def calculate_sampling_points(duration: float) -> list:
+    """
+    Return timestamps at 5%,10%,20%...90% of duration.
+    """
+    percentages = [5, 10, 20, 30, 40, 50, 60, 70, 80, 90]
+    points = [(duration * p) / 100 for p in percentages]
+    
+    return points
+
+async def smart_language_detection(client, message, ms=None):
     metadata = await extract_media_metadata(client, message)
+    duration = metadata["duration"]
+
+    if not duration or duration <= 0:
+        return {}
+
+    sampling_points = calculate_sampling_points(duration)
+
+    results = {}
+    streams_info = metadata.get("ffprobe_data")
+
+    # Get audio track count
+    audio_tracks = []
+    if streams_info:
+        for s in streams_info.get("streams", []):
+            if s.get("codec_type") == "audio":
+                audio_tracks.append(s["index"])
+
+    if not audio_tracks:
+        print("❌ No audio tracks found.")
+        return {}
+
+    for track_index in range(len(audio_tracks)):
+
+        print(f"\n🎧 Processing Track {track_index}")
+
+        votes = defaultdict(int)
+        strong_votes = 0
+
+        for base_timestamp in sampling_points:
+
+            current_timestamp = base_timestamp
+            attempts = 0
+
+            while attempts < 5:  # max retries per percentage
+                attempts += 1
+
+                print(f"🎯 Sampling at {int(current_timestamp)} sec")
+
+                partial_file = await stream_30s_window(
+                    client,
+                    message,
+                    current_timestamp
+                )
+
+                if not partial_file:
+                    break
+
+                audio_file = await extract_audio_from_partial(
+                    partial_file,
+                    track_index
+                )
+
+                if not audio_file:
+                    os.remove(partial_file)
+                    break
+
+                lang, confidence = await ai_detect_audio_language(audio_file)
+
+                print(f"🌐 {lang} ({confidence})")
+
+                os.remove(audio_file)
+                os.remove(partial_file)
+
+                if confidence >= 0.90 and lang != "Unknown":
+                    votes[lang] += 1
+                    strong_votes += 1
+                    print(f"✅ Vote added for {lang}")
+                    break
+                else:
+                    # jump 60 sec forward
+                    current_timestamp += 60
+
+            if strong_votes >= 10:
+                print("🛑 10 strong votes reached.")
+                break
+
+        if votes:
+            final_lang = max(votes, key=votes.get)
+        else:
+            final_lang = "Unknown"
+
+        results[track_index] = final_lang
+        print(f"🏆 Final language Track {track_index}: {final_lang}")
+
+    return results
 
 
+async def stream_30s_window(client, message, start_sec, duration_sec=30, temp_dir="downloads"):
+    """
+    Stream only the approximate byte range needed for 30 seconds.
+    """
 
+    os.makedirs(temp_dir, exist_ok=True)
 
+    media = message.video or message.document or message.audio
+    file_size = getattr(media, "file_size", None)
+    total_duration = getattr(media, "duration", None)
+
+    if not file_size or not total_duration:
+        return None
+
+    bytes_per_second = file_size / float(total_duration)
+
+    start_byte = int(bytes_per_second * start_sec)
+    end_byte = int(bytes_per_second * (start_sec + duration_sec))
+
+    chunk_size = end_byte - start_byte
+    if chunk_size <= 0:
+        return None
+
+    temp_path = os.path.join(temp_dir, f"partial_{message.id}_{int(start_sec)}.mkv")
+
+    downloaded = 0
+    current_pos = 0
+
+    try:
+        with open(temp_path, "wb") as f:
+            async for chunk in client.stream_media(message):
+                chunk_len = len(chunk)
+
+                if current_pos + chunk_len < start_byte:
+                    current_pos += chunk_len
+                    continue
+
+                f.write(chunk)
+                downloaded += chunk_len
+                current_pos += chunk_len
+
+                if downloaded >= chunk_size:
+                    break
+
+        if os.path.exists(temp_path):
+            return temp_path
+
+        return None
+
+    except Exception as e:
+        print("❌ Stream error:", e)
+        return None
 
 async def extract_media_metadata(client, message):
     """
