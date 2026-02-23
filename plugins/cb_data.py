@@ -14,8 +14,10 @@ from helper.ffmpeg import (
     fix_thumb,
     add_metadata,
     ai_rename_file,
-    smart_language_detection
+    smart_language_detection,
+    probe_media_with_ffprobe
 )
+from iso639 import languages
 
 from helper.progress import humanbytes
 from helper.set import escape_invalid_curly_brackets
@@ -595,6 +597,67 @@ async def ai_detect_language_handler(bot, update):
 
 
 
+@Client.on_callback_query(filters.regex("^ffprobe_detect_language$"))
+async def ffprobe_detect_language_callback(bot: Client, callback: CallbackQuery):
+    print("⚡ [Callback] 'ffprobe_detect_language' triggered.")
+
+    await callback.answer("Detecting languages...")
+
+    probe_data = await probe_media_with_ffprobe(bot, callback.message)
+
+    if not probe_data:
+        await callback.message.reply_text("❌ Failed to probe media.")
+        return
+
+    streams = probe_data.get("streams", [])
+
+    audio_languages = []
+    subtitle_languages = []
+
+    for stream in streams:
+        codec_type = stream.get("codec_type")
+        tags = stream.get("tags", {})
+        lang_code = tags.get("language")
+
+        if not lang_code:
+            continue
+
+        # Convert ISO code to full language name
+        try:
+            lang_name = languages.get(alpha3=lang_code).name
+        except:
+            lang_name = lang_code.upper()
+
+        if codec_type == "audio":
+            audio_languages.append(lang_name)
+
+        elif codec_type == "subtitle":
+            subtitle_languages.append(lang_name)
+
+    # Remove duplicates
+    audio_languages = list(dict.fromkeys(audio_languages))
+    subtitle_languages = list(dict.fromkeys(subtitle_languages))
+
+    # Format output
+    text = "🎬 <b>Language Information</b>\n\n"
+
+    if audio_languages:
+        text += "🔊 <b>Audio Tracks:</b>\n"
+        for i, lang in enumerate(audio_languages, 1):
+            text += f"  {i}. {lang}\n"
+    else:
+        text += "🔊 <b>Audio Tracks:</b> Not found\n"
+
+    text += "\n"
+
+    if subtitle_languages:
+        text += "💬 <b>Subtitles:</b>\n"
+        for i, lang in enumerate(subtitle_languages, 1):
+            text += f"  {i}. {lang}\n"
+    else:
+        text += "💬 <b>Subtitles:</b> Not found\n"
+
+    await callback.message.reply_text(text, parse_mode="html")
 
 
 

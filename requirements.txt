@@ -14,3 +14,4 @@ ffmpeg
 langdetect
 faster-whisper
 pymediainfo
+iso639

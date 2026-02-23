@@ -234,6 +234,9 @@ __What Do You Want Me To Do With This File ?__
                                     InlineKeyboardButton("🌐 AI Lᴀɴɢ Dᴇᴛᴇᴄᴛ", callback_data = "ai_detect_language")
                                 ],
                                 [
+                                    InlineKeyboardButton("⚡Instant Lᴀɴɢ Dᴇᴛᴇᴄᴛ", callback_data = "ffprobe_detect_language"),
+                                ],
+                                [
                                     InlineKeyboardButton("🖼  𝗗𝗼𝘄𝗻𝗹𝗼𝗮𝗱 𝗧𝗵𝘂𝗺𝗯", callback_data="getthumb"),
                                     InlineKeyboardButton("🖼  𝗗𝗼𝘄𝗻𝗹𝗼𝗮𝗱 𝗖𝗼𝘃𝗲𝗿", callback_data="getcover")
                                 ],
@@ -306,8 +309,11 @@ __What Do You Want Me To Do With This File ?__
                             
                         ],
                         [
-                            InlineKeyboardButton("⚡ Lᴀɴɢ Dᴇᴛᴇᴄᴛ", callback_data = "detect_language"),
+                            InlineKeyboardButton("⚡Lᴀɴɢ Dᴇᴛᴇᴄᴛ", callback_data = "detect_language"),
                             InlineKeyboardButton("🌐 AI Lᴀɴɢ Dᴇᴛᴇᴄᴛ", callback_data = "ai_detect_language")
+                        ],
+                        [
+                            InlineKeyboardButton("⚡Instant Lᴀɴɢ Dᴇᴛᴇᴄᴛ", callback_data = "ffprobe_detect_language"),
                         ],
                         [
                             InlineKeyboardButton("🖼  𝗗𝗼𝘄𝗻𝗹𝗼𝗮𝗱 𝗧𝗵𝘂𝗺𝗯", callback_data="getthumb"),

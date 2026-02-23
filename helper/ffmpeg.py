@@ -185,6 +185,399 @@ async def ai_rename_file(bot, file_path, file_name):
 
 
 
+
+
+
+
+
+
+
+
+
+
+
+
+async def probe_media_with_ffprobe(client, message, temp_dir="downloads"):
+    """
+    Download small header chunk and extract full media info using ffprobe.
+
+    Returns:
+        dict or None
+    """
+
+    os.makedirs(temp_dir, exist_ok=True)
+    temp_path = os.path.join(temp_dir, f"probe_{message.id}.mkv")
+
+    CHUNK_LIMIT = 2 * 1024 * 1024  # 5MB header is enough
+    downloaded = 0
+
+    try:
+        # Download header only
+        with open(temp_path, "wb") as f:
+            async for chunk in client.stream_media(message, limit=CHUNK_LIMIT):
+                f.write(chunk)
+                downloaded += len(chunk)
+                if downloaded >= CHUNK_LIMIT:
+                    break
+
+        if not os.path.exists(temp_path):
+            print("❌ Header download failed.")
+            return None
+
+        # Run ffprobe in JSON mode
+        cmd = [
+            "ffprobe",
+            "-v", "error",
+            "-print_format", "json",
+            "-show_format",
+            "-show_streams",
+            temp_path
+        ]
+
+        proc = await asyncio.create_subprocess_exec(
+            *cmd,
+            stdout=asyncio.subprocess.PIPE,
+            stderr=asyncio.subprocess.PIPE
+        )
+
+        stdout, stderr = await proc.communicate()
+
+        if not stdout:
+            print("❌ ffprobe returned no output.")
+            return None
+
+        probe_data = json.loads(stdout.decode())
+
+        print("✅ ffprobe probe successful.")
+        return probe_data
+
+    except Exception as e:
+        print(f"❌ ffprobe error: {e}")
+        return None
+
+    finally:
+        if os.path.exists(temp_path):
+            try:
+                os.remove(temp_path)
+            except:
+                pass
+
+
+
+
+
+
+
+# --- SIMPLE 10% PARTIAL DOWNLOAD & LANGUAGE DETECTION ---
+
+async def smart_language_detection(
+    client,
+    message,
+    ms=None,              # message to edit for progress (optional)
+):
+    """
+    Simple strategy:
+      - Download only the first 10% of the file (by size).
+      - Use that partial file as a valid MKV/MP4 (it contains header).
+      - For each audio track:
+          - Cut a short `clip_seconds` clip from the *start* of partial.
+          - Run ai_detect_audio_language() on that clip.
+      - Show progress + elapsed time via `ms.edit(...)`.
+
+    Returns:
+        dict[int, str] -> {audio_track_index: language_name}
+    """
+
+    clip_seconds = 30
+
+    temp_dir = "downloads"
+    os.makedirs(temp_dir, exist_ok=True)
+
+    media = message.video or message.document or message.audio
+    if not media:
+        print("❌ No media in message.")
+        return {}
+
+    duration = getattr(media, "duration", None)
+    file_size = getattr(media, "file_size", None)
+
+    if not file_size or file_size <= 0:
+        print("⚠️ No valid file_size from Telegram.")
+        return {}
+
+    # Decide extension (just for filename)
+    ext = os.path.splitext(getattr(media, "file_name", "") or "")[1] or ".mkv"
+    message_id = message.id
+    partial_file = os.path.join(temp_dir, f"partial_{message_id}{ext}")
+
+    # --- Download bytes that roughly cover 1–10 minutes ---
+    if not duration or duration <= 0:
+        # Fallback: if no duration, keep old 10% behaviour
+        seconds_to_cover = 10 * 60
+        bytes_per_second = file_size / float(seconds_to_cover)
+    else:
+        # Cover up to first 10 minutes or the whole movie if < 10 min
+        seconds_to_cover = min(duration, 10 * 60)
+        bytes_per_second = file_size / float(duration)
+
+    limit_bytes = int(bytes_per_second * seconds_to_cover)
+
+    # Safety: at least 10MB, at most full file
+    min_bytes = 10 * 1024 * 1024
+    if limit_bytes < min_bytes and file_size > min_bytes:
+        limit_bytes = min_bytes
+    if limit_bytes > file_size:
+        limit_bytes = file_size
+
+    # (optional) store approx covered duration for later use
+    approx_covered_seconds = limit_bytes / bytes_per_second
+
+
+    print(f"📥 10% partial download: file_size={file_size}, limit_bytes={limit_bytes}")
+
+    start_time = time.time()
+    downloaded = 0
+    last_percent = -1
+
+    try:
+        with open(partial_file, "wb") as f:
+            async for chunk in client.stream_media(message, limit=limit_bytes):
+                f.write(chunk)
+                downloaded += len(chunk)
+
+                if ms:
+                    # progress relative to planned 10% chunk
+                    percent = int(downloaded * 100 / limit_bytes)
+                    # Update every ~5% to avoid flood
+                    if percent >= last_percent + 5:
+                        elapsed = int(time.time() - start_time)
+                        try:
+                            await ms.edit(
+                                f"<b>📥 Downloading first 10% for language detection...</b>\n\n"
+                                f"Progress: <b>{percent}%</b>\n"
+                                f"Downloaded: <code>{downloaded / 1024 / 1024:.1f} MB"
+                                f" / {limit_bytes / 1024 / 1024:.1f} MB</code>\n"
+                                f"⏱ Elapsed: <b>{elapsed}s</b>"
+                            )
+                        except Exception:
+                            pass
+                        last_percent = percent
+
+                if downloaded >= limit_bytes:
+                    break
+
+        print(f"✅ 10% partial downloaded: {downloaded / 1024 / 1024:.2f} MB -> {partial_file}")
+
+        if not os.path.exists(partial_file):
+            print("❌ Partial file not created.")
+            return {}
+
+        if ms:
+            elapsed = int(time.time() - start_time)
+            try:
+                await ms.edit(
+                    f"<b>✅ Download complete. Extracting & detecting languages...</b>\n\n"
+                    f"⏱ Elapsed so far: <b>{elapsed}s</b>"
+                )
+            except Exception:
+                pass
+
+        # --- Probe audio streams in partial file ---
+        cmd_probe = [
+            "ffprobe", "-v", "error",
+            "-show_entries", "stream=index,codec_type",
+            "-of", "csv=p=0",
+            partial_file
+        ]
+        proc = await asyncio.create_subprocess_exec(
+            *cmd_probe,
+            stdout=asyncio.subprocess.PIPE,
+            stderr=asyncio.subprocess.PIPE
+        )
+        stdout, stderr = await proc.communicate()
+        probe_out = stdout.decode().strip()
+
+        audio_tracks = []
+        if probe_out:
+            for line in probe_out.splitlines():
+                try:
+                    idx, codec_type = line.strip().split(",")
+                    if codec_type == "audio":
+                        audio_tracks.append(int(idx))
+                except ValueError:
+                    continue
+
+        print(f"🎧 Audio streams found (by ffprobe): {audio_tracks}")
+
+        if not audio_tracks:
+            print("❌ No audio streams in partial file.")
+            return {}
+
+
+        results = {}
+        total_tracks = len(audio_tracks)
+
+        # Approx duration actually covered by partial (we stored above)
+        try:
+            effective_duration = approx_covered_seconds
+        except NameError:
+            # fallback: assume we covered at least 10 minutes
+            effective_duration = 10 * 60
+
+        # For each audio track, take multiple 30s clips between 1–10 min
+        for audio_pos, global_idx in enumerate(audio_tracks):
+            langs_for_track = []
+            print(f"🔍 Processing audio track {audio_pos} (ffprobe index={global_idx})")
+
+            # Candidate start times (in seconds) inside 1–10 min region
+            candidate_offsets = [120, 180, 300, 420, 540]  # 2m, 3m, 5m, 7m, 9m
+
+            for offset in candidate_offsets:
+                # Do not seek beyond what we actually downloaded
+                if offset + clip_seconds > effective_duration:
+                    print(f"⚠️ Skipping offset {offset}s (beyond partial duration ~{effective_duration:.1f}s)")
+                    continue
+
+                sample_path = os.path.join(
+                    temp_dir, f"sample_{message_id}_a{audio_pos}_{offset}.aac"
+                )
+
+                cmd_extract = [
+                    "ffmpeg", "-y",
+                    "-ss", str(offset),
+                    "-i", partial_file,
+                    "-map", f"0:a:{audio_pos}",
+                    "-t", str(clip_seconds),
+                    "-c:a", "copy",          # keep original audio
+                    sample_path
+                ]
+
+                print(f"🎧 Extracting 30s sample for track {audio_pos} at {offset}s -> {sample_path}")
+                proc = await asyncio.create_subprocess_exec(
+                    *cmd_extract,
+                    stdout=asyncio.subprocess.PIPE,
+                    stderr=asyncio.subprocess.PIPE
+                )
+                await proc.communicate()
+
+                if not os.path.exists(sample_path) or os.path.getsize(sample_path) < 1024:
+                    print(f"❌ Failed or too small sample at {offset}s for track {audio_pos}")
+                    try:
+                        os.remove(sample_path)
+                    except Exception:
+                        pass
+                    continue
+
+                # Detect language for this 30s sample
+                detection_result = await ai_detect_audio_language(sample_path)
+                
+                # Safely unpack the tuple (language_name, probability_score)
+                if isinstance(detection_result, tuple) and len(detection_result) == 2:
+                    lang_name, score = detection_result
+                else:
+                    lang_name, score = "Unknown", 0.0
+                
+                print(f"🌐 Track {audio_pos} @ {offset}s -> {lang_name} (Score: {score})")
+
+                # Treat non-Unknown as a successful detection
+                if lang_name != "Unknown":
+                    # Store BOTH the name and the score so we can compare them later
+                    langs_for_track.append((lang_name, score))
+
+                # Cleanup sample
+                try:
+                    os.remove(sample_path)
+                except Exception:
+                    pass
+
+                # Stop after 5 successful detections for this track
+                if len(langs_for_track) >= 5:
+                    break
+
+            # Decide final language for this track based on HIGHEST SCORE
+            if not langs_for_track:
+                final_lang = "Unknown"
+            else:
+                # Find the tuple with the highest score (the second item in the tuple)
+                best_match = max(langs_for_track, key=lambda item: item[1])
+                final_lang = best_match[0]  # Extract JUST the string name (e.g., "Hindi")
+                best_score = best_match[1]
+
+            results[audio_pos] = final_lang
+            print(f"✅ Final language for track {audio_pos}: {final_lang} (Highest Score: {best_score if langs_for_track else 0})")
+
+            # Progress update per track
+            if ms:
+                elapsed = int(time.time() - start_time)
+                try:
+                    await ms.edit(
+                        f"<b>🎧 Detecting languages from ~1–10 min window...</b>\n\n"
+                        f"Tracks analyzed: <b>{audio_pos + 1}/{total_tracks}</b>\n"
+                        f"Last track: <b>{final_lang}</b>\n"
+                        f"⏱ Elapsed: <b>{elapsed}s</b>"
+                    )
+                except Exception:
+                    pass
+
+            print(f"🌐 Final language for track {audio_pos}: {final_lang}")
+
+            # Progress update per track
+            if ms:
+                elapsed = int(time.time() - start_time)
+                try:
+                    await ms.edit(
+                        f"<b>🎧 Detecting languages from first 10%...</b>\n\n"
+                        f"Tracks analyzed: <b>{audio_pos + 1}/{total_tracks}</b>\n"
+                        f"Last track: <b>{final_lang}</b>\n"
+                        f"⏱ Elapsed: <b>{elapsed}s</b>"
+                    )
+                except Exception:
+                    pass
+
+            # Cleanup sample
+            try:
+                os.remove(sample_path)
+            except Exception:
+                pass
+
+        return results
+
+    except Exception as e:
+        print(f"❌ Error in detect_languages_first_10_percent: {e}")
+        return {}
+    finally:
+        # Cleanup partial file
+        if os.path.exists(partial_file):
+            try:
+                os.remove(partial_file)
+            except Exception:
+                pass
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 async def get_media_streams(file_path: str) -> dict:
     """
     Detect all streams in media file.
@@ -220,6 +613,17 @@ async def get_media_streams(file_path: str) -> dict:
 
     return streams
 
+
+
+
+
+
+
+
+
+
+
+
 async def extract_audio_from_partial(partial_file, track_index):
     """
     Extract 30 sec audio from streamed partial.
@@ -249,6 +653,15 @@ async def extract_audio_from_partial(partial_file, track_index):
 
     return None
 
+
+
+
+
+
+
+
+
+
 def calculate_sampling_points(duration: float) -> list:
     """
     Return timestamps at 5%,10%,20%...90% of duration.
@@ -258,93 +671,13 @@ def calculate_sampling_points(duration: float) -> list:
 
     return points
 
-async def smart_language_detection(client, message, ms=None):
-    metadata = await extract_media_metadata(client, message)
-    duration = metadata["duration"]
 
-    if not duration or duration <= 0:
-        return {}
 
-    sampling_points = calculate_sampling_points(duration)
 
-    results = {}
-    streams_info = metadata.get("ffprobe_data")
 
-    # Get audio track count
-    audio_tracks = []
-    if streams_info:
-        for s in streams_info.get("streams", []):
-            if s.get("codec_type") == "audio":
-                audio_tracks.append(s["index"])
 
-    if not audio_tracks:
-        print("❌ No audio tracks found.")
-        return {}
 
-    for track_index in range(len(audio_tracks)):
 
-        print(f"\n🎧 Processing Track {track_index}")
-
-        votes = defaultdict(int)
-        strong_votes = 0
-
-        for base_timestamp in sampling_points:
-
-            current_timestamp = base_timestamp
-            attempts = 0
-
-            while attempts < 5:  # max retries per percentage
-                attempts += 1
-
-                print(f"🎯 Sampling at {int(current_timestamp)} sec")
-
-                partial_file = await stream_30s_window(
-                    client,
-                    message,
-                    current_timestamp
-                )
-
-                if not partial_file:
-                    break
-
-                audio_file = await extract_audio_from_partial(
-                    partial_file,
-                    track_index
-                )
-
-                if not audio_file:
-                    os.remove(partial_file)
-                    break
-
-                lang, confidence = await ai_detect_audio_language(audio_file)
-
-                print(f"🌐 {lang} ({confidence})")
-
-                os.remove(audio_file)
-                os.remove(partial_file)
-
-                if confidence >= 0.90 and lang != "Unknown":
-                    votes[lang] += 1
-                    strong_votes += 1
-                    print(f"✅ Vote added for {lang}")
-                    break
-                else:
-                    # jump 60 sec forward
-                    current_timestamp += 60
-
-            if strong_votes >= 10:
-                print("🛑 10 strong votes reached.")
-                break
-
-        if votes:
-            final_lang = max(votes, key=votes.get)
-        else:
-            final_lang = "Unknown"
-
-        results[track_index] = final_lang
-        print(f"🏆 Final language Track {track_index}: {final_lang}")
-
-    return results
 
 
 async def stream_30s_window(client, message, start_sec, duration_sec=30, temp_dir="downloads"):
@@ -399,6 +732,18 @@ async def stream_30s_window(client, message, start_sec, duration_sec=30, temp_di
     except Exception as e:
         print("❌ Stream error:", e)
         return None
+
+
+
+
+
+
+
+
+
+
+
+
 
 async def extract_media_metadata(client, message):
     """
@@ -461,372 +806,6 @@ async def extract_media_metadata(client, message):
 
 
 
-
-
-async def probe_media_with_ffprobe(client, message, temp_dir="downloads"):
-    """
-    Download small header chunk and extract full media info using ffprobe.
-
-    Returns:
-        dict or None
-    """
-
-    os.makedirs(temp_dir, exist_ok=True)
-    temp_path = os.path.join(temp_dir, f"probe_{message.id}.mkv")
-
-    CHUNK_LIMIT = 5 * 1024 * 1024  # 5MB header is enough
-    downloaded = 0
-
-    try:
-        # Download header only
-        with open(temp_path, "wb") as f:
-            async for chunk in client.stream_media(message, limit=CHUNK_LIMIT):
-                f.write(chunk)
-                downloaded += len(chunk)
-                if downloaded >= CHUNK_LIMIT:
-                    break
-
-        if not os.path.exists(temp_path):
-            print("❌ Header download failed.")
-            return None
-
-        # Run ffprobe in JSON mode
-        cmd = [
-            "ffprobe",
-            "-v", "error",
-            "-print_format", "json",
-            "-show_format",
-            "-show_streams",
-            temp_path
-        ]
-
-        proc = await asyncio.create_subprocess_exec(
-            *cmd,
-            stdout=asyncio.subprocess.PIPE,
-            stderr=asyncio.subprocess.PIPE
-        )
-
-        stdout, stderr = await proc.communicate()
-
-        if not stdout:
-            print("❌ ffprobe returned no output.")
-            return None
-
-        probe_data = json.loads(stdout.decode())
-
-        print("✅ ffprobe probe successful.")
-        return probe_data
-
-    except Exception as e:
-        print(f"❌ ffprobe error: {e}")
-        return None
-
-    finally:
-        if os.path.exists(temp_path):
-            try:
-                os.remove(temp_path)
-            except:
-                pass
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-# # --- SIMPLE 10% PARTIAL DOWNLOAD & LANGUAGE DETECTION ---
-
-# async def detect_languages_first_10_percent(
-#     client,
-#     message,
-#     ms=None,              # message to edit for progress (optional)
-# ):
-#     """
-#     Simple strategy:
-#       - Download only the first 10% of the file (by size).
-#       - Use that partial file as a valid MKV/MP4 (it contains header).
-#       - For each audio track:
-#           - Cut a short `clip_seconds` clip from the *start* of partial.
-#           - Run ai_detect_audio_language() on that clip.
-#       - Show progress + elapsed time via `ms.edit(...)`.
-
-#     Returns:
-#         dict[int, str] -> {audio_track_index: language_name}
-#     """
-
-#     clip_seconds = 30
-
-#     temp_dir = "downloads"
-#     os.makedirs(temp_dir, exist_ok=True)
-
-#     media = message.video or message.document or message.audio
-#     if not media:
-#         print("❌ No media in message.")
-#         return {}
-
-#     duration = getattr(media, "duration", None)
-#     file_size = getattr(media, "file_size", None)
-
-#     if not file_size or file_size <= 0:
-#         print("⚠️ No valid file_size from Telegram.")
-#         return {}
-
-#     # Decide extension (just for filename)
-#     ext = os.path.splitext(getattr(media, "file_name", "") or "")[1] or ".mkv"
-#     message_id = message.id
-#     partial_file = os.path.join(temp_dir, f"partial_{message_id}{ext}")
-
-#     # --- Download bytes that roughly cover 1–10 minutes ---
-#     if not duration or duration <= 0:
-#         # Fallback: if no duration, keep old 10% behaviour
-#         seconds_to_cover = 10 * 60
-#         bytes_per_second = file_size / float(seconds_to_cover)
-#     else:
-#         # Cover up to first 10 minutes or the whole movie if < 10 min
-#         seconds_to_cover = min(duration, 10 * 60)
-#         bytes_per_second = file_size / float(duration)
-
-#     limit_bytes = int(bytes_per_second * seconds_to_cover)
-
-#     # Safety: at least 10MB, at most full file
-#     min_bytes = 10 * 1024 * 1024
-#     if limit_bytes < min_bytes and file_size > min_bytes:
-#         limit_bytes = min_bytes
-#     if limit_bytes > file_size:
-#         limit_bytes = file_size
-
-#     # (optional) store approx covered duration for later use
-#     approx_covered_seconds = limit_bytes / bytes_per_second
-
-
-#     print(f"📥 10% partial download: file_size={file_size}, limit_bytes={limit_bytes}")
-
-#     start_time = time.time()
-#     downloaded = 0
-#     last_percent = -1
-
-#     try:
-#         with open(partial_file, "wb") as f:
-#             async for chunk in client.stream_media(message, limit=limit_bytes):
-#                 f.write(chunk)
-#                 downloaded += len(chunk)
-
-#                 if ms:
-#                     # progress relative to planned 10% chunk
-#                     percent = int(downloaded * 100 / limit_bytes)
-#                     # Update every ~5% to avoid flood
-#                     if percent >= last_percent + 5:
-#                         elapsed = int(time.time() - start_time)
-#                         try:
-#                             await ms.edit(
-#                                 f"<b>📥 Downloading first 10% for language detection...</b>\n\n"
-#                                 f"Progress: <b>{percent}%</b>\n"
-#                                 f"Downloaded: <code>{downloaded / 1024 / 1024:.1f} MB"
-#                                 f" / {limit_bytes / 1024 / 1024:.1f} MB</code>\n"
-#                                 f"⏱ Elapsed: <b>{elapsed}s</b>"
-#                             )
-#                         except Exception:
-#                             pass
-#                         last_percent = percent
-
-#                 if downloaded >= limit_bytes:
-#                     break
-
-#         print(f"✅ 10% partial downloaded: {downloaded / 1024 / 1024:.2f} MB -> {partial_file}")
-
-#         if not os.path.exists(partial_file):
-#             print("❌ Partial file not created.")
-#             return {}
-
-#         if ms:
-#             elapsed = int(time.time() - start_time)
-#             try:
-#                 await ms.edit(
-#                     f"<b>✅ Download complete. Extracting & detecting languages...</b>\n\n"
-#                     f"⏱ Elapsed so far: <b>{elapsed}s</b>"
-#                 )
-#             except Exception:
-#                 pass
-
-#         # --- Probe audio streams in partial file ---
-#         cmd_probe = [
-#             "ffprobe", "-v", "error",
-#             "-show_entries", "stream=index,codec_type",
-#             "-of", "csv=p=0",
-#             partial_file
-#         ]
-#         proc = await asyncio.create_subprocess_exec(
-#             *cmd_probe,
-#             stdout=asyncio.subprocess.PIPE,
-#             stderr=asyncio.subprocess.PIPE
-#         )
-#         stdout, stderr = await proc.communicate()
-#         probe_out = stdout.decode().strip()
-
-#         audio_tracks = []
-#         if probe_out:
-#             for line in probe_out.splitlines():
-#                 try:
-#                     idx, codec_type = line.strip().split(",")
-#                     if codec_type == "audio":
-#                         audio_tracks.append(int(idx))
-#                 except ValueError:
-#                     continue
-
-#         print(f"🎧 Audio streams found (by ffprobe): {audio_tracks}")
-
-#         if not audio_tracks:
-#             print("❌ No audio streams in partial file.")
-#             return {}
-
-
-#         results = {}
-#         total_tracks = len(audio_tracks)
-
-#         # Approx duration actually covered by partial (we stored above)
-#         try:
-#             effective_duration = approx_covered_seconds
-#         except NameError:
-#             # fallback: assume we covered at least 10 minutes
-#             effective_duration = 10 * 60
-
-#         # For each audio track, take multiple 30s clips between 1–10 min
-#         for audio_pos, global_idx in enumerate(audio_tracks):
-#             langs_for_track = []
-#             print(f"🔍 Processing audio track {audio_pos} (ffprobe index={global_idx})")
-
-#             # Candidate start times (in seconds) inside 1–10 min region
-#             candidate_offsets = [120, 180, 300, 420, 540]  # 2m, 3m, 5m, 7m, 9m
-
-#             for offset in candidate_offsets:
-#                 # Do not seek beyond what we actually downloaded
-#                 if offset + clip_seconds > effective_duration:
-#                     print(f"⚠️ Skipping offset {offset}s (beyond partial duration ~{effective_duration:.1f}s)")
-#                     continue
-
-#                 sample_path = os.path.join(
-#                     temp_dir, f"sample_{message_id}_a{audio_pos}_{offset}.aac"
-#                 )
-
-#                 cmd_extract = [
-#                     "ffmpeg", "-y",
-#                     "-ss", str(offset),
-#                     "-i", partial_file,
-#                     "-map", f"0:a:{audio_pos}",
-#                     "-t", str(clip_seconds),
-#                     "-c:a", "copy",          # keep original audio
-#                     sample_path
-#                 ]
-
-#                 print(f"🎧 Extracting 30s sample for track {audio_pos} at {offset}s -> {sample_path}")
-#                 proc = await asyncio.create_subprocess_exec(
-#                     *cmd_extract,
-#                     stdout=asyncio.subprocess.PIPE,
-#                     stderr=asyncio.subprocess.PIPE
-#                 )
-#                 await proc.communicate()
-
-#                 if not os.path.exists(sample_path) or os.path.getsize(sample_path) < 1024:
-#                     print(f"❌ Failed or too small sample at {offset}s for track {audio_pos}")
-#                     try:
-#                         os.remove(sample_path)
-#                     except Exception:
-#                         pass
-#                     continue
-
-#                 # Detect language for this 30s sample
-#                 detection_result = await ai_detect_audio_language(sample_path)
-                
-#                 # Safely unpack the tuple (language_name, probability_score)
-#                 if isinstance(detection_result, tuple) and len(detection_result) == 2:
-#                     lang_name, score = detection_result
-#                 else:
-#                     lang_name, score = "Unknown", 0.0
-                
-#                 print(f"🌐 Track {audio_pos} @ {offset}s -> {lang_name} (Score: {score})")
-
-#                 # Treat non-Unknown as a successful detection
-#                 if lang_name != "Unknown":
-#                     # Store BOTH the name and the score so we can compare them later
-#                     langs_for_track.append((lang_name, score))
-
-#                 # Cleanup sample
-#                 try:
-#                     os.remove(sample_path)
-#                 except Exception:
-#                     pass
-
-#                 # Stop after 5 successful detections for this track
-#                 if len(langs_for_track) >= 5:
-#                     break
-
-#             # Decide final language for this track based on HIGHEST SCORE
-#             if not langs_for_track:
-#                 final_lang = "Unknown"
-#             else:
-#                 # Find the tuple with the highest score (the second item in the tuple)
-#                 best_match = max(langs_for_track, key=lambda item: item[1])
-#                 final_lang = best_match[0]  # Extract JUST the string name (e.g., "Hindi")
-#                 best_score = best_match[1]
-
-#             results[audio_pos] = final_lang
-#             print(f"✅ Final language for track {audio_pos}: {final_lang} (Highest Score: {best_score if langs_for_track else 0})")
-
-#             # Progress update per track
-#             if ms:
-#                 elapsed = int(time.time() - start_time)
-#                 try:
-#                     await ms.edit(
-#                         f"<b>🎧 Detecting languages from ~1–10 min window...</b>\n\n"
-#                         f"Tracks analyzed: <b>{audio_pos + 1}/{total_tracks}</b>\n"
-#                         f"Last track: <b>{final_lang}</b>\n"
-#                         f"⏱ Elapsed: <b>{elapsed}s</b>"
-#                     )
-#                 except Exception:
-#                     pass
-
-#             print(f"🌐 Final language for track {audio_pos}: {final_lang}")
-
-#             # Progress update per track
-#             if ms:
-#                 elapsed = int(time.time() - start_time)
-#                 try:
-#                     await ms.edit(
-#                         f"<b>🎧 Detecting languages from first 10%...</b>\n\n"
-#                         f"Tracks analyzed: <b>{audio_pos + 1}/{total_tracks}</b>\n"
-#                         f"Last track: <b>{final_lang}</b>\n"
-#                         f"⏱ Elapsed: <b>{elapsed}s</b>"
-#                     )
-#                 except Exception:
-#                     pass
-
-#             # Cleanup sample
-#             try:
-#                 os.remove(sample_path)
-#             except Exception:
-#                 pass
-
-#         return results
-
-#     except Exception as e:
-#         print(f"❌ Error in detect_languages_first_10_percent: {e}")
-#         return {}
-#     finally:
-#         # Cleanup partial file
-#         if os.path.exists(partial_file):
-#             try:
-#                 os.remove(partial_file)
-#             except Exception:
-#                 pass
 
 
 
