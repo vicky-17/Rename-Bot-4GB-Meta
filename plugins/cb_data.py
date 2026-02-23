@@ -600,13 +600,15 @@ async def ai_detect_language_handler(bot, update):
 @Client.on_callback_query(filters.regex("^ffprobe_detect_language$"))
 async def ffprobe_detect_language_callback(bot: Client, callback: CallbackQuery):
     print("⚡ [Callback] 'ffprobe_detect_language' triggered.")
-
     await callback.answer("Detecting languages...")
 
-    probe_data = await probe_media_with_ffprobe(bot, callback.message)
+    message = callback.message.reply_to_message
+
+    
+    probe_data = await probe_media_with_ffprobe(bot, message)
 
     if not probe_data:
-        await callback.message.reply_text("❌ Failed to probe media.")
+        await message.reply_text("❌ Failed to probe media.")
         return
 
     streams = probe_data.get("streams", [])
