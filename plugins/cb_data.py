@@ -598,13 +598,8 @@ async def ai_detect_language_handler(bot, update):
 
 
 @Client.on_callback_query(filters.regex("^ffprobe_detect_language$"))
-async def ffprobe_detect_language_callback(bot: Client, callback: CallbackQuery):
-    print("⚡ [Callback] 'ffprobe_detect_language' triggered.")
-    await callback.answer("Detecting languages...")
-
+async def ffprobe_detect_language_callback(bot, callback):
     message = callback.message.reply_to_message
-
-    
     probe_data = await probe_media_with_ffprobe(bot, message)
 
     if not probe_data:
@@ -626,7 +621,7 @@ async def ffprobe_detect_language_callback(bot: Client, callback: CallbackQuery)
 
         # Convert ISO code to full language name
         try:
-            lang_name = languages.get(alpha3=lang_code).name
+            lang_name = get_full_language_name(lang_code)
         except:
             lang_name = lang_code.upper()
 
@@ -664,6 +659,25 @@ async def ffprobe_detect_language_callback(bot: Client, callback: CallbackQuery)
 
 
 
+def get_full_language_name(lang_code):
+    if not lang_code:
+        return None
+
+    lang_code = lang_code.lower()
+
+    try:
+        # Try alpha3
+        if len(lang_code) == 3:
+            return languages.get(alpha3=lang_code).name
+
+        # Try alpha2
+        if len(lang_code) == 2:
+            return languages.get(alpha2=lang_code).name
+
+    except:
+        pass
+
+    return lang_code.upper()
 
 
 

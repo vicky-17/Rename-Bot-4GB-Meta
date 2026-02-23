@@ -198,19 +198,10 @@ async def ai_rename_file(bot, file_path, file_name):
 
 
 async def probe_media_with_ffprobe(client, message, temp_dir="downloads"):
-    """
-    Download small header chunk and extract full media info using ffprobe.
-
-    Returns:
-        dict or None
-    """
-
     os.makedirs(temp_dir, exist_ok=True)
     temp_path = os.path.join(temp_dir, f"probe_{message.id}.mkv")
-
-    CHUNK_LIMIT = 2 * 1024 * 1024  # 5MB header is enough
+    CHUNK_LIMIT = 1 * 1024 * 1024 
     downloaded = 0
-
     try:
         # Download header only
         with open(temp_path, "wb") as f:
@@ -219,38 +210,39 @@ async def probe_media_with_ffprobe(client, message, temp_dir="downloads"):
                 downloaded += len(chunk)
                 if downloaded >= CHUNK_LIMIT:
                     break
-
         if not os.path.exists(temp_path):
             print("❌ Header download failed.")
             return None
-
         # Run ffprobe in JSON mode
+        # cmd = [
+        #     "ffprobe",
+        #     "-v", "error",
+        #     "-print_format", "json",
+        #     "-show_format",
+        #     "-show_streams",
+        #     temp_path
+        # ]
+
+        # Only show audio + subtitle streams to speed up
         cmd = [
             "ffprobe",
             "-v", "error",
-            "-print_format", "json",
-            "-show_format",
-            "-show_streams",
+            "-select_streams", "a,s",
+            "-show_entries", "stream=index,codec_type:stream_tags=language",
+            "-of", "json",
             temp_path
         ]
-
         proc = await asyncio.create_subprocess_exec(
             *cmd,
             stdout=asyncio.subprocess.PIPE,
             stderr=asyncio.subprocess.PIPE
         )
-
         stdout, stderr = await proc.communicate()
-
         if not stdout:
             print("❌ ffprobe returned no output.")
             return None
-
         probe_data = json.loads(stdout.decode())
-
-        print("✅ ffprobe probe successful.")
         return probe_data
-
     except Exception as e:
         print(f"❌ ffprobe error: {e}")
         return None
