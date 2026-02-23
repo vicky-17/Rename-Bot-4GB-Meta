@@ -14,7 +14,6 @@ from helper.ffmpeg import (
     fix_thumb,
     add_metadata,
     ai_rename_file,
-    detect_languages_first_10_percent,
     smart_language_detection
 )
 
