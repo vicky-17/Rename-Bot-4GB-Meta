@@ -196,34 +196,51 @@ async def ai_rename_file(bot, file_path, file_name):
 
 
 
-
 async def probe_media_with_ffprobe(client, message, temp_dir="downloads"):
+    print("\n================= FFPROBE DEBUG START =================")
+
+    if not message:
+        print("❌ Message is None")
+        return None
+
+    media = message.video or message.document or message.audio
+    if not media:
+        print("❌ No media found in message")
+        return None
+
+    print(f"📁 File name: {getattr(media, 'file_name', None)}")
+    print(f"📦 File size: {getattr(media, 'file_size', None)}")
+    print(f"⏱ Duration: {getattr(media, 'duration', None)}")
+
     os.makedirs(temp_dir, exist_ok=True)
     temp_path = os.path.join(temp_dir, f"probe_{message.id}.mkv")
-    CHUNK_LIMIT = 1 * 1024 * 1024 
+
+    CHUNK_LIMIT = 1 * 1024 * 1024  # 1MB
     downloaded = 0
+
     try:
-        # Download header only
+        print("📥 Starting header download...")
+
         with open(temp_path, "wb") as f:
-            async for chunk in client.stream_media(message, limit=CHUNK_LIMIT):
+            async for chunk in client.stream_media(media, limit=CHUNK_LIMIT):
                 f.write(chunk)
                 downloaded += len(chunk)
+                print(f"   ➜ Downloaded: {downloaded} bytes")
+
                 if downloaded >= CHUNK_LIMIT:
                     break
-        if not os.path.exists(temp_path):
-            print("❌ Header download failed.")
-            return None
-        # Run ffprobe in JSON mode
-        # cmd = [
-        #     "ffprobe",
-        #     "-v", "error",
-        #     "-print_format", "json",
-        #     "-show_format",
-        #     "-show_streams",
-        #     temp_path
-        # ]
 
-        # Only show audio + subtitle streams to speed up
+        print(f"✅ Header download complete. Total: {downloaded} bytes")
+
+        if not os.path.exists(temp_path):
+            print("❌ Temp file not created")
+            return None
+
+        if downloaded == 0:
+            print("❌ Nothing downloaded")
+            return None
+
+        # FFPROBE COMMAND
         cmd = [
             "ffprobe",
             "-v", "error",
@@ -232,28 +249,55 @@ async def probe_media_with_ffprobe(client, message, temp_dir="downloads"):
             "-of", "json",
             temp_path
         ]
+
+        print("🚀 Running ffprobe command:")
+        print(" ".join(cmd))
+
         proc = await asyncio.create_subprocess_exec(
             *cmd,
             stdout=asyncio.subprocess.PIPE,
             stderr=asyncio.subprocess.PIPE
         )
+
         stdout, stderr = await proc.communicate()
-        if not stdout:
-            print("❌ ffprobe returned no output.")
+
+        print(f"🔢 ffprobe return code: {proc.returncode}")
+        print("📤 STDOUT:")
+        print(stdout.decode(errors="ignore"))
+        print("📤 STDERR:")
+        print(stderr.decode(errors="ignore"))
+
+        if proc.returncode != 0:
+            print("❌ ffprobe failed with non-zero return code")
             return None
-        probe_data = json.loads(stdout.decode())
-        return probe_data
+
+        if not stdout:
+            print("❌ ffprobe returned empty stdout")
+            return None
+
+        try:
+            probe_data = json.loads(stdout.decode())
+            print("✅ JSON parsed successfully")
+            print("Streams found:", probe_data.get("streams"))
+            return probe_data
+        except Exception as e:
+            print("❌ JSON parse error:", e)
+            return None
+
     except Exception as e:
-        print(f"❌ ffprobe error: {e}")
+        print("❌ Exception in probe_media_with_ffprobe:", e)
         return None
 
     finally:
+        print("🧹 Cleaning up temp file")
         if os.path.exists(temp_path):
             try:
                 os.remove(temp_path)
-            except:
-                pass
+                print("✅ Temp file removed")
+            except Exception as e:
+                print("❌ Failed to remove temp file:", e)
 
+        print("================= FFPROBE DEBUG END =================\n")
 
 
 

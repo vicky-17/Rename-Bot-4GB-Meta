@@ -544,6 +544,9 @@ async def aud(bot, update):
 
 
 
+
+
+
 @Client.on_callback_query(filters.regex("ai_detect_language"))
 async def ai_detect_language_handler(bot, update):
     message = update.message.reply_to_message
@@ -678,6 +681,9 @@ def get_full_language_name(lang_code):
         pass
 
     return lang_code.upper()
+
+
+
 
 
 
