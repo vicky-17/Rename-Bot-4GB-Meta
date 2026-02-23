@@ -255,7 +255,7 @@ def calculate_sampling_points(duration: float) -> list:
     """
     percentages = [5, 10, 20, 30, 40, 50, 60, 70, 80, 90]
     points = [(duration * p) / 100 for p in percentages]
-    
+
     return points
 
 async def smart_language_detection(client, message, ms=None):
@@ -428,11 +428,10 @@ async def extract_media_metadata(client, message):
 
 
     ffprobe_data = None
+    ffprobe_data = await probe_media_with_ffprobe(client, message)
     # If duration missing → probe header
     if not duration:
         print("⚠️ Duration missing. Probing header...")
-        ffprobe_data = await probe_media_with_ffprobe(client, message)
-
         if ffprobe_data:
             try:
                 duration = float(ffprobe_data["format"]["duration"])

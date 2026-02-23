@@ -230,7 +230,7 @@ __What Do You Want Me To Do With This File ?__
                                     
                                 ],
                                 [
-                                    InlineKeyboardButton("🌐 Lᴀɴɢ Dᴇᴛᴇᴄᴛ", callback_data = "detect_language"),
+                                    InlineKeyboardButton("⚡ Lᴀɴɢ Dᴇᴛᴇᴄᴛ", callback_data = "detect_language"),
                                     InlineKeyboardButton("🌐 AI Lᴀɴɢ Dᴇᴛᴇᴄᴛ", callback_data = "ai_detect_language")
                                 ],
                                 [
@@ -306,7 +306,7 @@ __What Do You Want Me To Do With This File ?__
                             
                         ],
                         [
-                            InlineKeyboardButton("🌐 Lᴀɴɢ Dᴇᴛᴇᴄᴛ", callback_data = "detect_language"),
+                            InlineKeyboardButton("⚡ Lᴀɴɢ Dᴇᴛᴇᴄᴛ", callback_data = "detect_language"),
                             InlineKeyboardButton("🌐 AI Lᴀɴɢ Dᴇᴛᴇᴄᴛ", callback_data = "ai_detect_language")
                         ],
                         [
