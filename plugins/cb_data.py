@@ -659,7 +659,7 @@ async def ffprobe_detect_language_callback(bot: Client, callback: CallbackQuery)
     else:
         text += "💬 <b>Subtitles:</b> Not found\n"
 
-    await callback.message.reply_text(text, parse_mode="html")
+    await callback.message.reply_text(text)
 
 
 
