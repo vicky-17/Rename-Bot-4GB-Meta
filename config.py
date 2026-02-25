@@ -21,7 +21,7 @@ ADMIN = int(os.environ.get("ADMIN", "6216066502"))
 STRING_SESSION = os.environ.get("STRING_SESSION", "")
 
 # Heroku Dynamic Port
-PORT = int(os.environ.get("PORT", "8080"))
+PORT = int(os.environ.get("PORT", "24047"))
 
 # Log & Force Channel Config
 FORCE_SUBS = int(os.environ.get("FORCE_SUBS", "-1002575243889"))

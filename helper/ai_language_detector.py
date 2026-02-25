@@ -5,6 +5,7 @@ import asyncio
 import os
 import logging
 import platform
+import psutil
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -34,7 +35,6 @@ def get_optimal_hardware_config():
     # 2. Check System RAM (in GB)
     total_ram_gb = 2.0  # Default assumption
     try:
-        import psutil
         total_ram_gb = psutil.virtual_memory().total / (1024 ** 3)
     except ImportError:
         # Fallback for Linux environments (Heroku, Koyeb, Colab) if psutil is not installed

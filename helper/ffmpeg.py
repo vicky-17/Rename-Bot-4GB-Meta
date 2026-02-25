@@ -336,13 +336,13 @@ async def smart_language_detection(client, message, ms=None):
     # 🟢 NEW: Calculate 3 different points in the movie (15%, 50%, and 85%) 
     # to guarantee we hit actual dialogue and avoid long silent/action scenes.
     if duration > 600:
-        offsets = [int(duration * 0.15), int(duration * 0.50), int(duration * 0.85)]
+        offsets = [int(duration * 0.15), int(duration * 0.35), int(duration * 0.45), int(duration * 0.55), int(duration * 0.75), int(duration * 0.85)]
     elif duration > 60:
         offsets = [int(duration * 0.30), int(duration * 0.60)]
     else:
         offsets = [0]
         
-    clip_seconds = 10 # 10 seconds per clip
+    clip_seconds = 5 # 10 seconds per clip
 
     # --- 1. EXTRACT MULTIPLE AUDIO CLIPS (SUPER FAST) ---
     temp_clips = []
