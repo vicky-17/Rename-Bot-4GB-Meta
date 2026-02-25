@@ -7,6 +7,8 @@ from pyrogram import Client , filters
 
 @Client.on_callback_query(filters.regex('upgrade'))
 async def upgrade(bot,update):
+    await update.answer("Piracy is Crime...", show_alert=False)
+
     text = """**Free Plan User**
 Daily  Upload limit 2GB
 Price 0

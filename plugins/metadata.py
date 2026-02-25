@@ -26,6 +26,8 @@ async def handle_metadata(bot: Client, message: Message):
 
 @Client.on_callback_query(filters.regex('.*?(custom_metadata|metadata).*?'))
 async def query_metadata(bot: Client, query: CallbackQuery):
+    await update.answer("Piracy is Crime...", show_alert=False)
+
 
     data = query.data
 

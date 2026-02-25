@@ -312,19 +312,8 @@ async def smart_language_detection(client, message, ms=None):
         print("❌ No media in message.")
         return {}
 
-    duration = getattr(media, "duration", 0)
 
-    # 🟢 NEW: Calculate 3 different points in the movie (15%, 50%, and 85%) 
-    # to guarantee we hit actual dialogue and avoid long silent/action scenes.
-    if duration > 600:
-        offsets = [int(duration * 0.15), int(duration * 0.50), int(duration * 0.85)]
-    elif duration > 60:
-        offsets = [int(duration * 0.30), int(duration * 0.60)]
-    else:
-        offsets = [0]
-        
-    clip_seconds = 15 # 15 seconds per clip
-
+    
     if ms:
         try:
             await ms.edit("<b>🔗 Generating Stream Link...</b>")
@@ -338,6 +327,22 @@ async def smart_language_detection(client, message, ms=None):
     except Exception as e:
         print(f"❌ Failed to generate stream URL: {e}")
         return {}
+
+
+    duration = getattr(media, "duration", None)
+    if not duration:
+        duration = await probe_duration_from_stream(stream_url)
+
+    # 🟢 NEW: Calculate 3 different points in the movie (15%, 50%, and 85%) 
+    # to guarantee we hit actual dialogue and avoid long silent/action scenes.
+    if duration > 600:
+        offsets = [int(duration * 0.15), int(duration * 0.50), int(duration * 0.85)]
+    elif duration > 60:
+        offsets = [int(duration * 0.30), int(duration * 0.60)]
+    else:
+        offsets = [0]
+        
+    clip_seconds = 15 # 15 seconds per clip
 
     # --- 1. EXTRACT MULTIPLE AUDIO CLIPS (SUPER FAST) ---
     temp_clips = []
@@ -451,3 +456,47 @@ async def smart_language_detection(client, message, ms=None):
     except: pass
     
     return results
+
+
+
+
+
+
+
+
+async def probe_duration_from_stream(stream_url):
+    cmd = [
+        "ffprobe",
+        "-v", "error",
+        "-show_entries", "format=duration",
+        "-of", "json",
+        stream_url
+    ]
+
+    proc = await asyncio.create_subprocess_exec(
+        *cmd,
+        stdout=asyncio.subprocess.PIPE,
+        stderr=asyncio.subprocess.PIPE
+    )
+
+    stdout, stderr = await proc.communicate()
+
+    if proc.returncode != 0:
+        print("❌ ffprobe failed:", stderr.decode())
+        return None
+
+    try:
+        data = json.loads(stdout.decode())
+        return float(data["format"]["duration"])
+    except:
+        return None
+
+
+
+
+
+
+
+
+
+

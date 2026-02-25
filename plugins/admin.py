@@ -102,6 +102,7 @@ async def resetpower(bot, message):
 # PREMIUM POWER MODE
 @Client.on_callback_query(filters.regex('vip1'))
 async def vip1(bot,update):
+    await update.answer("Piracy is Crime...", show_alert=False)
     print("📌 Update at vip1",update)
 
     id = update.message.reply_to_message.text.split("/addpremium")
@@ -118,6 +119,7 @@ async def vip1(bot,update):
 
 @Client.on_callback_query(filters.regex('vip2'))
 async def vip2(bot,update):
+    await update.answer("Piracy is Crime...", show_alert=False)
     id = update.message.reply_to_message.text.split("/addpremium")
     user_id = id[1].replace(" ", "")
     inlimit = 53687091200
@@ -131,6 +133,7 @@ async def vip2(bot,update):
 
 @Client.on_callback_query(filters.regex('vip3'))
 async def vip3(bot,update):
+    await update.answer("Piracy is Crime...", show_alert=False)
     id = update.message.reply_to_message.text.split("/addpremium")
     user_id = id[1].replace(" ", "")
     inlimit = 107374182400
@@ -147,6 +150,7 @@ async def vip3(bot,update):
 # CEASE POWER MODE 
 @Client.on_callback_query(filters.regex('cp1'))
 async def cp1(bot,update):
+    await update.answer("Piracy is Crime...", show_alert=False)
     id = update.message.reply_to_message.text.split("/ceasepower")
     user_id = id[1].replace(" ", "")
     inlimit  = 2147483652
@@ -160,6 +164,7 @@ async def cp1(bot,update):
 
 @Client.on_callback_query(filters.regex('cp2'))
 async def cp2(bot,update):
+    await update.answer("Piracy is Crime...", show_alert=False)
     id = update.message.reply_to_message.text.split("/ceasepower")
     user_id = id[1].replace(" ", "")
     inlimit  = 0
@@ -175,6 +180,7 @@ async def cp2(bot,update):
 # RESET POWER MODE
 @Client.on_callback_query(filters.regex('dft'))
 async def dft(bot,update):
+    await update.answer("Piracy is Crime...", show_alert=False)
     id = update.message.reply_to_message.text.split("/resetpower")
     user_id = id[1].replace(" ", "")
     inlimit = 2147483652

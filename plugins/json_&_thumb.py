@@ -7,14 +7,17 @@ from datetime import datetime
 # -------------------- CALLBACK -------------------- #
 @Client.on_callback_query(filters.regex("getthumb"))
 async def get_thumb_callback(client, update):
+    await update.answer("Piracy is Crime...", show_alert=False)
     await download_thumb(client, update.message)
 
 @Client.on_callback_query(filters.regex("getcover"))
 async def get_cover_callback(client, update):
+    await update.answer("Piracy is Crime...", show_alert=False)
     await download_cover(client, update.message)
 
 @Client.on_callback_query(filters.regex("jsondump"))
 async def jsondump_callback(client, update):
+    await update.answer("Piracy is Crime...", show_alert=False)
     await jsondump(client, update.message)
 
 

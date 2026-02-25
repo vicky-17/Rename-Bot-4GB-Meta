@@ -32,6 +32,7 @@ app = Client("VickyBotz", api_id=API_ID, api_hash=API_HASH, session_string=STRIN
 
 @Client.on_callback_query(filters.regex('cancel'))
 async def cancel(bot, update):
+    await update.answer("Piracy is Crime...", show_alert=False)
     try:
         await update.message.delete()
         await update.message.reply_to_message.delete()
@@ -45,6 +46,7 @@ async def cancel(bot, update):
 
 @Client.on_callback_query(filters.regex('^rename$'))
 async def rename(bot, update):
+    await update.answer("Piracy is Crime...", show_alert=False)
     print("📌 Manual renamer is called.")
     date_fa = str(update.message.date)
     pattern = '%Y-%m-%d %H:%M:%S'
@@ -64,6 +66,7 @@ async def rename(bot, update):
 
 @Client.on_callback_query(filters.regex("vid"))
 async def vid(bot, update):
+    await update.answer("Piracy is Crime...", show_alert=False)
     print("📌 This is in Video call back data :: ")
 
     # Creating Directory for Metadata
@@ -283,6 +286,7 @@ async def vid(bot, update):
 
 @Client.on_callback_query(filters.regex("doc"))
 async def doc(bot, update):
+    await update.answer("Piracy is Crime...", show_alert=False)
 
     # Creating Directory for Metadata
     if not os.path.isdir("Metadata"):
@@ -423,6 +427,7 @@ async def doc(bot, update):
 
 @Client.on_callback_query(filters.regex("aud"))
 async def aud(bot, update):
+    await update.answer("Piracy is Crime...", show_alert=False)
 
     # Creating Directory for Metadata
     if not os.path.isdir("Metadata"):
@@ -604,6 +609,7 @@ async def ai_detect_language_handler(bot, update):
 
 @Client.on_callback_query(filters.regex("^ffprobe_detect_language$"))
 async def ffprobe_detect_language_callback(bot, callback):
+    await update.answer("Piracy is Crime...", show_alert=False)
     message = callback.message.reply_to_message
     probe_data = await probe_media_with_ffprobe(bot, message)
 
@@ -691,6 +697,7 @@ def get_full_language_name(lang_code):
 
 @Client.on_callback_query(filters.regex("^detect_language$"))
 async def detect_language_callback(bot, update):
+    await update.answer("Piracy is Crime...", show_alert=False)
     print("🌐 [Callback] 'detect_language' triggered.")
     
     # Get the original message containing the media

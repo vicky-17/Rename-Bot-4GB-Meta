@@ -10,6 +10,7 @@ from config import *
 
 @Client.on_callback_query(filters.regex('about'))
 async def about(bot,update):
+    await update.answer("Piracy is Crime...", show_alert=False)
     text = script.ABOUT_TXT.format(bot.me.mention)
     keybord = InlineKeyboardMarkup([  
                     [InlineKeyboardButton("🔙 Back",callback_data = "home")]
@@ -39,6 +40,7 @@ async def admincm(bot,message):
 
 @Client.on_callback_query(filters.regex('help'))
 async def help(bot,update):
+    await update.answer("Piracy is Crime...", show_alert=False)
     text = script.HELP_TXT.format(update.from_user.mention)
     keybord = InlineKeyboardMarkup([ 
                     [InlineKeyboardButton('🏞 Thumbnail', callback_data='thumbnail'),
@@ -52,6 +54,7 @@ async def help(bot,update):
 
 @Client.on_callback_query(filters.regex('thumbnail'))
 async def thumbnail(bot,update):
+    await update.answer("Piracy is Crime...", show_alert=False)
     text = script.THUMBNAIL_TXT
     keybord = InlineKeyboardMarkup([  
                     [InlineKeyboardButton("🔙 Back",callback_data = "help")]
@@ -60,6 +63,7 @@ async def thumbnail(bot,update):
 
 @Client.on_callback_query(filters.regex('caption'))
 async def caption(bot,update):
+    await update.answer("Piracy is Crime...", show_alert=False)
     text = script.CAPTION_TXT
     keybord = InlineKeyboardMarkup([  
                     [InlineKeyboardButton("🔙 Back",callback_data = "help")]
@@ -68,6 +72,7 @@ async def caption(bot,update):
 
 @Client.on_callback_query(filters.regex('donate'))
 async def donate(bot,update):
+    await update.answer("Piracy is Crime...", show_alert=False)
     text = script.DONATE_TXT
     keybord = InlineKeyboardMarkup([  
                     [InlineKeyboardButton("🔙 Back",callback_data = "help")]
@@ -77,6 +82,7 @@ async def donate(bot,update):
 
 @Client.on_callback_query(filters.regex('home'))
 async def home_callback_handler(bot, query):
+    await update.answer("Piracy is Crime...", show_alert=False)
     text = f"""Hello {query.from_user.mention} \n\n➻ This Is An Advanced And Yet Powerful Rename Bot.\n\n➻ Using This Bot You Can Rename And Change Thumbnail Of Your Files.\n\n➻ You Can Also Convert Video To File Aɴᴅ File To Video.\n\n➻ This Bot Also Supports Custom Thumbnail And Custom Caption.\n\n<b>Bot Is Made By @Filmyswap123 </b>"""
     keybord = InlineKeyboardMarkup([  
                     [InlineKeyboardButton("📢 Updates", url="https://t.me/Filmyswap_Bots"),
