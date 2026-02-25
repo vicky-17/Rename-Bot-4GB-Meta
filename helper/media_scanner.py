@@ -49,7 +49,6 @@ async def extract_media_info(client, message):
         text = "🎬 **Media Scan Results**\n\n"
         text += f"⭐ **Audio Tracks ({len(audios)}):** {', '.join(audios) if audios else 'None'}\n"
         text += f"✏️ **Subtitle Tracks ({len(subs)}):** {', '.join(subs) if subs else 'None'}\n\n"
-        text += "📌 *All information is fetched directly from the file header API.*"
         
         return text
 

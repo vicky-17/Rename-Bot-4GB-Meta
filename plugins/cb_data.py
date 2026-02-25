@@ -549,6 +549,7 @@ async def aud(bot, update):
 
 @Client.on_callback_query(filters.regex("ai_detect_language"))
 async def ai_detect_language_handler(bot, update):
+    # print("message :: ",update)
     message = update.message.reply_to_message
     if not message:
         await update.message.edit("<b>❌ Reply-to message not found.</b>")
@@ -560,8 +561,9 @@ async def ai_detect_language_handler(bot, update):
         return
 
     # Initial status
-    ms = await update.message.edit(
-        "<b>🎧 Preparing to download first 10% & detect languages...</b>"
+    ms = await update.message.reply_text(
+        "<b>🎧 Preparing to download first 10% & detect languages...</b>",
+        reply_to_message_id=message.id
     )
 
     overall_start = time.time()

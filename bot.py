@@ -5,6 +5,8 @@ from pyrogram import Client, idle
 from plugins.cb_data import app as Client2
 from config import *
 import pyrogram.utils
+from server import start_web_server
+
 
 # Set up logging
 logging.basicConfig(
@@ -40,6 +42,8 @@ def main():
                 logging.error(f"Failed to start {app.name}: {e}\n{traceback.format_exc()}")
                 return
         logging.info("✅ All clients started successfully")
+
+        bot.loop.run_until_complete(start_web_server(bot))
         bot.loop.run_until_complete(notify_admins())  # Send message to admins
         idle()
         for app in apps:

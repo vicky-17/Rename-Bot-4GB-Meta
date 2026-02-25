@@ -14,11 +14,14 @@ load_dotenv()
 # Required Variables Config
 API_ID = int(os.environ.get("API_ID", "23884743"))
 API_HASH = os.environ.get("API_HASH", "b8c26efa0bc0e98f306094ca676165d2")
-BOT_TOKEN = os.environ.get("BOT_TOKEN", "8417112946:AAHwa2ma5KeDnVfRSTrVS_hkTfunHK49VxM")
+BOT_TOKEN = os.environ.get("BOT_TOKEN", "8417112946:AAFaIrcvRW3H3NVb6IBYu1WtM2yE2sdALo4")
 ADMIN = int(os.environ.get("ADMIN", "6216066502"))
 
 # Premium 4GB Renaming Client Config
-STRING_SESSION = os.environ.get("STRING_SESSION", "BQFsc8cAbkTdlS-gWfK93hYO0cvxzeBHlcJ4lZdexPqZIjtrV670iRx8NA3sXwkMGZOofqcLb5HH7SoNWTRjMlYyMQRstFQNHXLUltcyPREqiit91Bs8ERkFlIUhANECog3zXH9j-CqJl8vY38f8EACDMUXkbzQCU6Mcc1Cggf5mhLflSZAz0B8iKArFClEC-ZyOslvKCFaEFFI0TQHfozAGPjSpqtu_-6Sy1tda0L37JuXDKjJC4_kKXuI8KDYIWxouHpg1aRk8HSBJcPFHoGiW9pdEq8cHLiQuM15AGUQ-zOukjvCO5i95pFh2Cyyafq-_NOGAzVtYX4YhIcqGaFwL7-RuugAAAAFygaXGAA")
+STRING_SESSION = os.environ.get("STRING_SESSION", "")
+
+# Heroku Dynamic Port
+PORT = int(os.environ.get("PORT", "8080"))
 
 # Log & Force Channel Config
 FORCE_SUBS = int(os.environ.get("FORCE_SUBS", "-1002575243889"))
