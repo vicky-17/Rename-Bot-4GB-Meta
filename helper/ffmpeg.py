@@ -303,7 +303,6 @@ async def probe_media_with_ffprobe(client, message, temp_dir="downloads"):
 
 
 
-
 async def smart_language_detection(client, message, ms=None):
     temp_dir = "downloads"
     os.makedirs(temp_dir, exist_ok=True)
@@ -313,13 +312,18 @@ async def smart_language_detection(client, message, ms=None):
         print("❌ No media in message.")
         return {}
 
-    # Get duration, fallback to 0 if not present
     duration = getattr(media, "duration", 0)
 
-    # Decide offset: 10 minutes in (600s) to skip intros/silent logos. 
-    # If the video is very short, grab from 1/3rd of the way through.
-    offset = 600 if duration > 600 else (duration // 3 if duration > 30 else 0)
-    clip_seconds = 35
+    # 🟢 NEW: Calculate 3 different points in the movie (15%, 50%, and 85%) 
+    # to guarantee we hit actual dialogue and avoid long silent/action scenes.
+    if duration > 600:
+        offsets = [int(duration * 0.15), int(duration * 0.50), int(duration * 0.85)]
+    elif duration > 60:
+        offsets = [int(duration * 0.30), int(duration * 0.60)]
+    else:
+        offsets = [0]
+        
+    clip_seconds = 15 # 15 seconds per clip
 
     if ms:
         try:
@@ -327,7 +331,6 @@ async def smart_language_detection(client, message, ms=None):
         except:
             pass
 
-    # --- 1. GENERATE THE DIRECT STREAM URL ---
     try:
         from config import PORT
         from .stream_utils import get_hash
@@ -336,58 +339,75 @@ async def smart_language_detection(client, message, ms=None):
         print(f"❌ Failed to generate stream URL: {e}")
         return {}
 
-    # --- 2. EXTRACT A 20-SECOND AUDIO-ONLY SAMPLE (SUPER FAST) ---
+    # --- 1. EXTRACT MULTIPLE AUDIO CLIPS (SUPER FAST) ---
+    temp_clips = []
+    
     if ms:
         try:
-            await ms.edit("<b>✂️ Extracting 20s audio sample (Skipping video to save time)...</b>")
+            await ms.edit(f"<b>✂️ Extracting {len(offsets)} audio samples to find clear dialogue...</b>")
         except:
             pass
 
-    sample_mkv = os.path.join(temp_dir, f"audio_sample_{message.id}.mkv")
-    
-    cmd_extract = [
+    for i, offset in enumerate(offsets):
+        clip_path = os.path.join(temp_dir, f"audio_clip_{message.id}_{i}.mkv")
+        cmd_extract = [
+            "ffmpeg", "-y",
+            "-ss", str(offset),
+            "-i", stream_url,
+            "-t", str(clip_seconds),
+            "-map", "0:a",      # Grab ALL audio tracks
+            "-vn", "-sn",       # NO video, NO subtitles
+            "-c:a", "copy",     # Direct copy
+            clip_path
+        ]
+        
+        proc = await asyncio.create_subprocess_exec(
+            *cmd_extract,
+            stdout=asyncio.subprocess.PIPE,
+            stderr=asyncio.subprocess.PIPE
+        )
+        await proc.communicate()
+
+        if os.path.exists(clip_path) and os.path.getsize(clip_path) > 1024:
+            temp_clips.append(clip_path)
+
+    if not temp_clips:
+        print("❌ Failed to extract audio samples.")
+        return {}
+
+    # --- 2. STITCH CLIPS TOGETHER ---
+    sample_mkv = os.path.join(temp_dir, f"final_audio_sample_{message.id}.mkv")
+    concat_txt_path = os.path.join(temp_dir, f"concat_{message.id}.txt")
+
+    with open(concat_txt_path, "w") as f:
+        for clip in temp_clips:
+            f.write(f"file '{os.path.abspath(clip)}'\n")
+
+    cmd_concat = [
         "ffmpeg", "-y",
-        "-ss", str(offset),
-        "-i", stream_url,
-        "-t", str(clip_seconds),
-        "-map", "0:a",      # Grab ALL audio tracks at once
-        "-vn", "-sn",       # NO video, NO subtitles (Saves massive bandwidth and time)
-        "-c:a", "copy",     # Direct copy, no CPU encoding
+        "-f", "concat",
+        "-safe", "0",
+        "-i", concat_txt_path,
+        "-map", "0",
+        "-c", "copy",
         sample_mkv
     ]
-    
+
     proc = await asyncio.create_subprocess_exec(
-        *cmd_extract,
+        *cmd_concat,
         stdout=asyncio.subprocess.PIPE,
         stderr=asyncio.subprocess.PIPE
     )
     await proc.communicate()
 
-    # Fallback: If fast seek failed (rare, but happens with bad MKV headers), grab the first 20s
-    if not os.path.exists(sample_mkv) or os.path.getsize(sample_mkv) < 1024:
-        print("⚠️ Seek failed, falling back to start of file...")
-        cmd_extract_fallback = [
-            "ffmpeg", "-y",
-            "-i", stream_url,
-            "-t", str(clip_seconds),
-            "-map", "0:a",
-            "-vn", "-sn",
-            "-c:a", "copy",
-            sample_mkv
-        ]
-        proc = await asyncio.create_subprocess_exec(
-            *cmd_extract_fallback, stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.PIPE
-        )
-        await proc.communicate()
-
-    if not os.path.exists(sample_mkv) or os.path.getsize(sample_mkv) < 1024:
-        print("❌ Failed to extract audio sample.")
-        return {}
+    # Cleanup individual clips
+    for clip in temp_clips:
+        try: os.remove(clip)
+        except: pass
+    try: os.remove(concat_txt_path)
+    except: pass
 
     # --- 3. PROCESS WITH WHISPER AI ---
-    from pymediainfo import MediaInfo
-    from helper.ai_language_detector import ai_detect_audio_language
-    
     media_info = MediaInfo.parse(sample_mkv)
     audio_tracks = [t for t in media_info.tracks if t.track_type == "Audio"]
     
@@ -402,7 +422,6 @@ async def smart_language_detection(client, message, ms=None):
     for idx, track in enumerate(audio_tracks):
         temp_audio = os.path.join(temp_dir, f"temp_audio_{message.id}_{idx}.aac")
         
-        # Extract individual audio tracks to feed into Whisper
         cmd_extract_audio = [
             "ffmpeg", "-y",
             "-i", sample_mkv,
@@ -419,7 +438,6 @@ async def smart_language_detection(client, message, ms=None):
         
         if os.path.exists(temp_audio):
             try:
-                # Send to Whisper
                 detected_lang, prob = await ai_detect_audio_language(temp_audio)
                 results[idx] = f"{detected_lang} ({(prob * 100):.1f}%)"
             except Exception as e:
@@ -429,7 +447,6 @@ async def smart_language_detection(client, message, ms=None):
                 try: os.remove(temp_audio)
                 except: pass
 
-    # Cleanup the multi-track audio sample
     try: os.remove(sample_mkv)
     except: pass
     
