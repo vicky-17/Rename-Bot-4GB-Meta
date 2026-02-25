@@ -421,8 +421,6 @@ async def smart_language_detection(client, message, ms=None):
 
 
     # --- 5. PROCESS WITH WHISPER ---
-
-    
     media_info = MediaInfo.parse(final_mkv)
     audio_tracks = [t for t in media_info.tracks if t.track_type == "Audio"]
     
