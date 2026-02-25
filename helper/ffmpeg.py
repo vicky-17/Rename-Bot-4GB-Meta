@@ -342,7 +342,7 @@ async def smart_language_detection(client, message, ms=None):
     else:
         offsets = [0]
         
-    clip_seconds = 5 # 10 seconds per clip
+    clip_seconds = 6 # 10 seconds per clip
 
     # --- 1. EXTRACT MULTIPLE AUDIO CLIPS (SUPER FAST) ---
     temp_clips = []
@@ -443,8 +443,14 @@ async def smart_language_detection(client, message, ms=None):
         
         if os.path.exists(temp_audio):
             try:
-                detected_lang, prob = await ai_detect_audio_language(temp_audio)
-                results[idx] = f"{detected_lang} ({(prob * 100):.1f}%)"
+                res = await ai_detect_audio_language(temp_audio)
+                if res and isinstance(res, tuple):
+                    detected_lang, prob = res
+                    # Ensure prob is not None before math
+                    safe_prob = prob if prob is not None else 0.0
+                    results[idx] = f"{detected_lang} ({(safe_prob * 100):.1f}%)"
+                else:
+                    results[idx] = "Unknown"
             except Exception as e:
                 print(f"Error detecting language for track {idx}: {e}")
                 results[idx] = "Error"
