@@ -79,10 +79,17 @@ async def stream_handler(request):
         await response.prepare(request)
 
         # 3. Stream the specific bytes directly to FFmpeg
-        async for chunk in yield_file(tg_client, message, start, end):
-            await response.write(chunk)
+        try:
+            async for chunk in yield_file(tg_client, message, start, end):
+                await response.write(chunk)
+        except Exception as e:
+            # FFmpeg frequently closes connections early when probing/skipping.
+            # We silently ignore connection drops to avoid console spam.
+            err_str = str(e).lower()
+            if "closing transport" not in err_str and "connection reset" not in err_str:
+                print(f"⚠️ Stream Write Interrupted: {e}")
             
-        return response
+            return response # Exit cleanly since client disconnected
         
     except Exception as e:
         print(f"Stream Server Error: {e}")
