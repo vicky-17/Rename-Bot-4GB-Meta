@@ -305,7 +305,6 @@ async def probe_media_with_ffprobe(client, message, temp_dir="downloads"):
 
 
 async def smart_language_detection(client, message, ms=None):
-    clip_seconds = 30
     temp_dir = "downloads"
     os.makedirs(temp_dir, exist_ok=True)
 
@@ -314,8 +313,13 @@ async def smart_language_detection(client, message, ms=None):
         print("❌ No media in message.")
         return {}
 
-    # Get duration, fallback to 10 minutes if not present
-    duration = getattr(media, "duration", None)
+    # Get duration, fallback to 0 if not present
+    duration = getattr(media, "duration", 0)
+
+    # Decide offset: 10 minutes in (600s) to skip intros/silent logos. 
+    # If the video is very short, grab from 1/3rd of the way through.
+    offset = 600 if duration > 600 else (duration // 3 if duration > 30 else 0)
+    clip_seconds = 20  # 20 seconds is plenty for Whisper AI
 
     if ms:
         try:
@@ -325,118 +329,83 @@ async def smart_language_detection(client, message, ms=None):
 
     # --- 1. GENERATE THE DIRECT STREAM URL ---
     try:
-        print("message:", message.id)
-        # 🟢 ADDED chat_id to the URL route so the server knows where to fetch the message
+        from config import PORT
+        from .stream_utils import get_hash
         stream_url = f"http://127.0.0.1:{PORT}/{message.chat.id}/{message.id}?hash={get_hash(message)}"
-        print(f"🔗 Stream URL generated: {stream_url}")
     except Exception as e:
         print(f"❌ Failed to generate stream URL: {e}")
         return {}
 
-    # --- 2. EXTRACT CLIPS AS FULL MKVs (VIDEO+AUDIO+SUBTITLES) ---
-    candidate_offsets = [120, 700, 980, 1500]
-    valid_offsets = [off for off in candidate_offsets if off + clip_seconds <= duration]
-    if not valid_offsets:
-        valid_offsets = [0]
-
-    temp_clips = []
-    
+    # --- 2. EXTRACT A 20-SECOND AUDIO-ONLY SAMPLE (SUPER FAST) ---
     if ms:
         try:
-            await ms.edit(f"<b>✂️ Extracting {len(valid_offsets)} clips over network...</b>")
+            await ms.edit("<b>✂️ Extracting 20s audio sample (Skipping video to save time)...</b>")
         except:
             pass
 
-    for i, offset in enumerate(valid_offsets):
-        clip_path = os.path.join(temp_dir, f"clip_{message.id}_{i}.mkv")
-        
-        cmd_extract = [
-            "ffmpeg", "-y",
-            "-ss", str(offset),
-            "-i", stream_url,
-            "-t", str(clip_seconds),
-            "-map", "0",        # Keep all streams (Video, Audio, Subs)
-            "-c", "copy",       # Direct stream copy (No CPU Re-encoding)
-            clip_path
-        ]
-        
-        proc = await asyncio.create_subprocess_exec(
-            *cmd_extract,
-            stdout=asyncio.subprocess.PIPE,
-            stderr=asyncio.subprocess.PIPE
-        )
-        await proc.communicate()
-
-        # Verify the clip was created
-        if os.path.exists(clip_path) and os.path.getsize(clip_path) > 1024:
-            temp_clips.append(clip_path)
-
-    if not temp_clips:
-        print("❌ Failed to extract any clips.")
-        return {}
+    sample_mkv = os.path.join(temp_dir, f"audio_sample_{message.id}.mkv")
     
-    
-    # --- 3. STITCH CLIPS INTO ONE FINAL MKV ---
-    if ms:
-        try:
-            await ms.edit("<b>🧵 Stitching clips into one final file...</b>")
-        except:
-            pass
-
-    concat_txt_path = os.path.join(temp_dir, f"concat_{message.id}.txt")
-    final_mkv = os.path.join(temp_dir, f"FINAL_{message.id}.mkv")
-
-    # Write the paths to the concat text file
-    with open(concat_txt_path, "w") as f:
-        for clip in temp_clips:
-            # FFmpeg requires absolute paths formatted like: file '/path/to/clip.mkv'
-            f.write(f"file '{os.path.abspath(clip)}'\n")
-
-    cmd_concat = [
+    cmd_extract = [
         "ffmpeg", "-y",
-        "-f", "concat",
-        "-safe", "0",
-        "-i", concat_txt_path,
-        "-map", "0",
-        "-c", "copy",       # Again, direct copy to keep Video/Audio/Subs intact instantly
-        final_mkv
+        "-ss", str(offset),
+        "-i", stream_url,
+        "-t", str(clip_seconds),
+        "-map", "0:a",      # Grab ALL audio tracks at once
+        "-vn", "-sn",       # NO video, NO subtitles (Saves massive bandwidth and time)
+        "-c:a", "copy",     # Direct copy, no CPU encoding
+        sample_mkv
     ]
-
+    
     proc = await asyncio.create_subprocess_exec(
-        *cmd_concat,
+        *cmd_extract,
         stdout=asyncio.subprocess.PIPE,
         stderr=asyncio.subprocess.PIPE
     )
     await proc.communicate()
 
-    print(f"✅ Final full MKV created: {final_mkv} | Size: {os.path.getsize(final_mkv)} bytes")
+    # Fallback: If fast seek failed (rare, but happens with bad MKV headers), grab the first 20s
+    if not os.path.exists(sample_mkv) or os.path.getsize(sample_mkv) < 1024:
+        print("⚠️ Seek failed, falling back to start of file...")
+        cmd_extract_fallback = [
+            "ffmpeg", "-y",
+            "-i", stream_url,
+            "-t", str(clip_seconds),
+            "-map", "0:a",
+            "-vn", "-sn",
+            "-c:a", "copy",
+            sample_mkv
+        ]
+        proc = await asyncio.create_subprocess_exec(
+            *cmd_extract_fallback, stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.PIPE
+        )
+        await proc.communicate()
 
-    # --- 4. CLEANUP TEMPORARY FILES ---
-    for clip in temp_clips:
-        try: os.remove(clip)
-        except: pass
-    try: os.remove(concat_txt_path)
-    except: pass
-    # 🟢 REMOVED log_msg.delete() since we are no longer sending to a log channel
+    if not os.path.exists(sample_mkv) or os.path.getsize(sample_mkv) < 1024:
+        print("❌ Failed to extract audio sample.")
+        return {}
 
-
-    # --- 5. PROCESS WITH WHISPER ---
-    media_info = MediaInfo.parse(final_mkv)
+    # --- 3. PROCESS WITH WHISPER AI ---
+    from pymediainfo import MediaInfo
+    from helper.ai_language_detector import ai_detect_audio_language
+    
+    media_info = MediaInfo.parse(sample_mkv)
     audio_tracks = [t for t in media_info.tracks if t.track_type == "Audio"]
     
     results = {}
     
     if ms:
         try:
-            await ms.edit(f"<b>🎙 Running AI language detection on {len(audio_tracks)} audio tracks...</b>")
+            await ms.edit(f"<b>🎙 Running AI detection on {len(audio_tracks)} audio tracks...</b>")
         except:
             pass
 
     for idx, track in enumerate(audio_tracks):
         temp_audio = os.path.join(temp_dir, f"temp_audio_{message.id}_{idx}.aac")
+        
+        # Extract individual audio tracks to feed into Whisper
         cmd_extract_audio = [
             "ffmpeg", "-y",
-            "-i", final_mkv,
+            "-i", sample_mkv,
             "-map", f"0:a:{idx}",
             "-c:a", "aac",
             temp_audio
@@ -450,7 +419,7 @@ async def smart_language_detection(client, message, ms=None):
         
         if os.path.exists(temp_audio):
             try:
-                # Extract detected language and probability
+                # Send to Whisper
                 detected_lang, prob = await ai_detect_audio_language(temp_audio)
                 results[idx] = f"{detected_lang} ({(prob * 100):.1f}%)"
             except Exception as e:
@@ -460,7 +429,8 @@ async def smart_language_detection(client, message, ms=None):
                 try: os.remove(temp_audio)
                 except: pass
 
-    try: os.remove(final_mkv)
+    # Cleanup the multi-track audio sample
+    try: os.remove(sample_mkv)
     except: pass
     
     return results
