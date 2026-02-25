@@ -319,7 +319,7 @@ async def smart_language_detection(client, message, ms=None):
     # Decide offset: 10 minutes in (600s) to skip intros/silent logos. 
     # If the video is very short, grab from 1/3rd of the way through.
     offset = 600 if duration > 600 else (duration // 3 if duration > 30 else 0)
-    clip_seconds = 20  # 20 seconds is plenty for Whisper AI
+    clip_seconds = 35
 
     if ms:
         try:
