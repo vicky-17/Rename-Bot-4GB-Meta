@@ -342,7 +342,7 @@ async def smart_language_detection(client, message, ms=None):
     else:
         offsets = [0]
         
-    clip_seconds = 15 # 15 seconds per clip
+    clip_seconds = 10 # 10 seconds per clip
 
     # --- 1. EXTRACT MULTIPLE AUDIO CLIPS (SUPER FAST) ---
     temp_clips = []
