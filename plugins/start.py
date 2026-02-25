@@ -91,23 +91,23 @@ async def process_user_upload(client, message):
             if message.from_user:
                 await client.send_message(
                     LOG_CHANNEL,
-                    f"<b><u>New User Started The Bot</u></b>\n\n",
-                    f"<b>User ID :</b> <code>{user_id}</code>",
-                    f"<b>First Name :</b> {message.from_user.first_name}",
-                    f"<b>Last Name :</b> {message.from_user.last_name}",
-                    f"<b>User Name :</b> @{message.from_user.username}",
-                    f"<b>User Mention :</b> {message.from_user.mention}",
-                    f"<b>User Link :</b> <a href='tg://openmessage?user_id={user_id}'>Click Here</a>",
-                    f"<b>User Plan :</b> {user}"
+                    (f"<b><u>New User Started The Bot</u></b>\n\n"
+                     f"<b>User ID :</b> <code>{user_id}</code>\n"
+                     f"<b>First Name :</b> {message.from_user.first_name}\n"
+                     f"<b>Last Name :</b> {message.from_user.last_name}\n"
+                     f"<b>User Name :</b> @{message.from_user.username}\n"
+                     f"<b>User Mention :</b> {message.from_user.mention}\n"
+                     f"<b>User Link :</b> <a href='tg://openmessage?user_id={user_id}'>Click Here</a>\n"
+                     f"<b>User Plan :</b> {user}")
                 )
             else:
                 # Optional: Log for channels
                 await client.send_message(
                     LOG_CHANNEL,
-                    f"<b><u>New Channel Started The Bot</u></b>",
-                    f"<b>Channel ID :</b> <code>{user_id}</code>",
-                    f"<b>Channel Title :</b> {message.chat.title}",
-                    f"<b>User Plan :</b> {user}"
+                    (f"<b><u>New Channel Started The Bot</u></b>\n"
+                     f"<b>Channel ID :</b> <code>{user_id}</code>\n"
+                     f"<b>Channel Title :</b> {message.chat.title}\n"
+                     f"<b>User Plan :</b> {user}")
                 )
             return
 

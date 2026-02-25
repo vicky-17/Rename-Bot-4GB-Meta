@@ -1,4 +1,4 @@
-# Rename-Bot-4GB-Meta-main\bot.py
+# Rename-Bot-4GB-Meta\bot.py
 import logging
 import traceback
 from pyrogram import Client, idle
@@ -6,7 +6,6 @@ from plugins.cb_data import app as Client2
 from config import *
 import pyrogram.utils
 from server import start_web_server
-
 
 # Set up logging
 logging.basicConfig(
@@ -25,35 +24,44 @@ async def notify_admins():
     try:
         await bot.send_message(
             chat_id=ADMIN,
-            text="✅ Bot started successfully on Heroku! Ready to rename files."
+            text="✅ Bot & Stream Server started successfully! Ready to rename files."
         )
         logging.info(f"Startup message sent to admin {ADMIN}")
     except Exception as e:
-        logging.error(f"Failed to send startup message to admin {ADMIN}: {e}\n{traceback.format_exc()}")
+        logging.error(f"Failed to send startup message to admin {ADMIN}: {e}")
 
 def main():
-    if STRING_SESSION:
-        apps = [Client2, bot]
-        for app in apps:
-            try:
-                app.start()
-                logging.info(f"{app.name} started successfully")
-            except Exception as e:
-                logging.error(f"Failed to start {app.name}: {e}\n{traceback.format_exc()}")
-                return
-        logging.info("✅ All clients started successfully")
+    # 1. Start the main bot client
+    bot.start()
+    logging.info("✅ Main Bot started successfully")
 
-        bot.loop.run_until_complete(start_web_server(bot))
-        bot.loop.run_until_complete(notify_admins())  # Send message to admins
-        idle()
-        for app in apps:
-            app.stop()
-        logging.info("🛑 All clients stopped gracefully")
-    else:
-        bot.run()
+    # 2. Start the premium string session client (if it exists)
+    if STRING_SESSION:
+        try:
+            Client2.start()
+            logging.info("✅ Premium Client started successfully")
+        except Exception as e:
+            logging.error(f"Failed to start Premium Client: {e}")
+
+    # 3. Start the internal web server for FFmpeg streaming
+    bot.loop.run_until_complete(start_web_server(bot))
+    
+    # 4. Notify Admins
+    bot.loop.run_until_complete(notify_admins())
+    
+    # 5. Keep the bot alive and listening for messages
+    idle()
+    
+    # 6. Stop everything gracefully when shutting down
+    bot.stop()
+    if STRING_SESSION:
+        Client2.stop()
+    logging.info("🛑 All clients stopped gracefully")
 
 if __name__ == "__main__":
     try:
         main()
     except Exception as e:
         logging.error(f"Bot crashed: {e}\n{traceback.format_exc()}")
+
+    

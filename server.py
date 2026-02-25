@@ -32,13 +32,15 @@ async def yield_file(client, message, start, end):
         if downloaded >= target_bytes:
             break
 
-@routes.get('/{message_id}')
+@routes.get('/{chat_id}/{message_id}')
 async def stream_handler(request):
     try:
+        chat_id = int(request.match_info['chat_id'])
         message_id = int(request.match_info['message_id'])
         
-        # 1. Fetch message from Log Channel
-        message = await tg_client.get_messages(LOG_CHANNEL, message_id)
+        # 1. Fetch message directly from the provided chat
+        message = await tg_client.get_messages(chat_id, message_id)
+
         if not message or message.empty:
             return web.Response(status=404, text="Message not found")
 

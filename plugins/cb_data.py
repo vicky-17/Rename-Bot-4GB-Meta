@@ -549,7 +549,7 @@ async def aud(bot, update):
 
 @Client.on_callback_query(filters.regex("ai_detect_language"))
 async def ai_detect_language_handler(bot, update):
-    # print("message :: ",update)
+    await update.answer("Detecting language, please wait...", show_alert=False)
     message = update.message.reply_to_message
     if not message:
         await update.message.edit("<b>❌ Reply-to message not found.</b>")

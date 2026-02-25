@@ -302,7 +302,7 @@ async def probe_media_with_ffprobe(client, message, temp_dir="downloads"):
 
 
 
-async def smart_language_detection(client, message, ms=None, ):
+async def smart_language_detection(client, message, ms=None):
     clip_seconds = 30
     temp_dir = "downloads"
     os.makedirs(temp_dir, exist_ok=True)
@@ -313,7 +313,7 @@ async def smart_language_detection(client, message, ms=None, ):
         return {}
 
     # Get duration, fallback to 10 minutes if not present
-    duration = getattr(media, "duration", None) or 600
+    duration = getattr(media, "duration", None)
 
     if ms:
         try:
@@ -323,19 +323,16 @@ async def smart_language_detection(client, message, ms=None, ):
 
     # --- 1. GENERATE THE DIRECT STREAM URL ---
     try:
-        log_msg = await client.send_cached_media(
-            chat_id=LOG_CHANNEL,
-            file_id=media.file_id,
-        )
-        print("log_msg:", log_msg)
-        stream_url = f"http://127.0.0.1:{PORT}/{str(log_msg.id)}?hash={get_hash(log_msg)}"
+        print("message:", message.id)
+        # 🟢 ADDED chat_id to the URL route so the server knows where to fetch the message
+        stream_url = f"http://127.0.0.1:{PORT}/{message.chat.id}/{message.id}?hash={get_hash(message)}"
         print(f"🔗 Stream URL generated: {stream_url}")
     except Exception as e:
         print(f"❌ Failed to generate stream URL: {e}")
         return {}
 
-    # --- 2. EXTRACT 3 CLIPS AS FULL MKVs (VIDEO+AUDIO+SUBTITLES) ---
-    candidate_offsets = [120, 300, 480] # 2m, 5m, 8m
+    # --- 2. EXTRACT CLIPS AS FULL MKVs (VIDEO+AUDIO+SUBTITLES) ---
+    candidate_offsets = [120, 700, 980, 1500]
     valid_offsets = [off for off in candidate_offsets if off + clip_seconds <= duration]
     if not valid_offsets:
         valid_offsets = [0]
@@ -375,7 +372,8 @@ async def smart_language_detection(client, message, ms=None, ):
     if not temp_clips:
         print("❌ Failed to extract any clips.")
         return {}
-
+    
+    
     # --- 3. STITCH CLIPS INTO ONE FINAL MKV ---
     if ms:
         try:
@@ -417,22 +415,53 @@ async def smart_language_detection(client, message, ms=None, ):
         except: pass
     try: os.remove(concat_txt_path)
     except: pass
-    try: await log_msg.delete()
+    # 🟢 REMOVED log_msg.delete() since we are no longer sending to a log channel
+
+
+    # --- 5. PROCESS WITH WHISPER ---
+    from helper.ai_language_detector import ai_detect_audio_language
+    from pymediainfo import MediaInfo
+    
+    media_info = MediaInfo.parse(final_mkv)
+    audio_tracks = [t for t in media_info.tracks if t.track_type == "Audio"]
+    
+    results = {}
+    
+    if ms:
+        try:
+            await ms.edit(f"<b>🎙 Running AI language detection on {len(audio_tracks)} audio tracks...</b>")
+        except:
+            pass
+
+    for idx, track in enumerate(audio_tracks):
+        temp_audio = os.path.join(temp_dir, f"temp_audio_{message.id}_{idx}.aac")
+        cmd_extract_audio = [
+            "ffmpeg", "-y",
+            "-i", final_mkv,
+            "-map", f"0:a:{idx}",
+            "-c:a", "aac",
+            temp_audio
+        ]
+        proc = await asyncio.create_subprocess_exec(
+            *cmd_extract_audio,
+            stdout=asyncio.subprocess.PIPE,
+            stderr=asyncio.subprocess.PIPE
+        )
+        await proc.communicate()
+        
+        if os.path.exists(temp_audio):
+            try:
+                # Extract detected language and probability
+                detected_lang, prob = await ai_detect_audio_language(temp_audio)
+                results[idx] = f"{detected_lang} ({(prob * 100):.1f}%)"
+            except Exception as e:
+                print(f"Error detecting language for track {idx}: {e}")
+                results[idx] = "Error"
+            finally:
+                try: os.remove(temp_audio)
+                except: pass
+
+    try: os.remove(final_mkv)
     except: pass
-
-    # =========================================================
-    # AT THIS POINT: final_mkv is a single valid MKV file 
-    # containing video, audio, and subtitles from different 
-    # timestamps of the movie. 
-    # 
-    # You can now pass `final_mkv` to your Whisper AI or probe it!
-    # =========================================================
     
-    # Example:
-    # results = await run_whisper_on_file(final_mkv)
-    # return results
-    
-    return final_mkv
-
-
-
+    return results
