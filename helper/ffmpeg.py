@@ -16,6 +16,8 @@ from config import LOG_CHANNEL, PORT
 from .ai_language_detector import ai_detect_audio_language
 from .stream_utils import get_hash
 
+from pymediainfo import MediaInfo
+
 
 
 async def fix_thumb(thumb):
@@ -419,8 +421,7 @@ async def smart_language_detection(client, message, ms=None):
 
 
     # --- 5. PROCESS WITH WHISPER ---
-    from helper.ai_language_detector import ai_detect_audio_language
-    from pymediainfo import MediaInfo
+
     
     media_info = MediaInfo.parse(final_mkv)
     audio_tracks = [t for t in media_info.tracks if t.track_type == "Audio"]
