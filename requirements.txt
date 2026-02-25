@@ -15,3 +15,4 @@ langdetect
 faster-whisper
 pymediainfo
 iso-639
+psutil

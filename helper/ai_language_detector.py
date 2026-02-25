@@ -4,55 +4,114 @@ from faster_whisper import WhisperModel
 import asyncio
 import os
 import logging
+import platform
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-# --- SMART CONFIGURATION ---
-# Auto-detect if we are running on Heroku (Heroku automatically sets the "DYNO" environment variable)
-if os.environ.get("DYNO"):
-    print("☁️ Heroku Environment Detected! Applying Low-RAM CPU optimizations...")
-    # 🔴 HEROKU SETTINGS (Low RAM, Weak CPU)
-    MODEL_SIZE = "base"    # "base" is the safest for 512MB RAM. 
-    DEVICE = "cpu"         # Heroku does not have GPUs
-    COMPUTE_TYPE = "int8"  # Squeezes the model size by 50% to prevent memory crashes
-    THREADS = 2            # Limits CPU cores so Heroku doesn't freeze/timeout
-else:
-    print("🚀 Google Colab / Local Environment Detected! Applying GPU optimizations...")
-    # 🟢 GOOGLE COLAB SETTINGS (High RAM, Powerful GPU)
-    MODEL_SIZE = "small"   # "small" or "medium" for flawless Indian language accuracy
-    DEVICE = "cuda"        # Forces the use of the Nvidia GPU
-    COMPUTE_TYPE = "float16" # float16 is lightning fast on modern GPUs
-    THREADS = 4            # More threads for faster pre-processing
+def get_optimal_hardware_config():
+    """Detects system hardware and returns the best Faster-Whisper configuration."""
+    
+    config = {
+        "model_size": "base",
+        "device": "cpu",
+        "compute_type": "int8",
+        "threads": 2,
+        "env_name": "Unknown"
+    }
 
-print(f"⚡ Loading Faster-Whisper model ({MODEL_SIZE}) on {DEVICE}...")
+    # 1. Check for GPU (CUDA)
+    has_gpu = False
+    try:
+        import ctranslate2
+        # If there is at least 1 CUDA device, we can use the GPU
+        if ctranslate2.get_cuda_device_count() > 0:
+            has_gpu = True
+    except Exception:
+        pass
+
+    # 2. Check System RAM (in GB)
+    total_ram_gb = 2.0  # Default assumption
+    try:
+        import psutil
+        total_ram_gb = psutil.virtual_memory().total / (1024 ** 3)
+    except ImportError:
+        # Fallback for Linux environments (Heroku, Koyeb, Colab) if psutil is not installed
+        if hasattr(os, 'sysconf'):
+            try:
+                ram_bytes = os.sysconf('SC_PAGE_SIZE') * os.sysconf('SC_PHYS_PAGES')
+                total_ram_gb = ram_bytes / (1024 ** 3)
+            except Exception:
+                pass
+
+    # 3. Check CPU Cores
+    cpu_cores = os.cpu_count() or 2
+
+    # --- DECISION LOGIC ---
+    if has_gpu:
+        config["env_name"] = "🚀 GPU Environment (Colab/Local PC)"
+        config["device"] = "cuda"
+        config["compute_type"] = "float16" # Lightning fast on GPU
+        config["model_size"] = "small"     # Small/Medium is highly accurate for Indian languages
+        config["threads"] = max(2, cpu_cores - 1)
+        
+    else:
+        # CPU Only Environments
+        config["device"] = "cpu"
+        config["compute_type"] = "int8" # Int8 is best and fastest for CPU
+        
+        # Free Tier / Low Spec (Heroku, Koyeb Free, < 2GB RAM)
+        if total_ram_gb <= 2.0 or os.environ.get("DYNO") or os.environ.get("KOYEB_SERVICE_ID"):
+            config["env_name"] = "☁️ Low-RAM Cloud (Heroku/Koyeb Free)"
+            config["model_size"] = "base"
+            config["threads"] = 2
+            
+        # Standard Laptop / Medium Server (2GB - 8GB RAM)
+        elif total_ram_gb <= 8.0:
+            config["env_name"] = "💻 Standard CPU Environment"
+            config["model_size"] = "base" 
+            config["threads"] = max(2, cpu_cores // 2)
+            
+        # High-End CPU Server / Beefy Laptop (> 8GB RAM)
+        else:
+            config["env_name"] = "🖥️ High-RAM CPU Server"
+            config["model_size"] = "small" # Safe to load smarter models
+            config["threads"] = max(2, cpu_cores - 2)
+
+    return config
+
+# --- INITIALIZE SMART CONFIGURATION ---
+hw_config = get_optimal_hardware_config()
+print(f"\n{hw_config['env_name']}")
+print(f"⚡ Loading Faster-Whisper [{hw_config['model_size']}] on [{hw_config['device'].upper()}] (Threads: {hw_config['threads']}, Compute: {hw_config['compute_type']})...\n")
 
 try:
-    # Attempt to load the model with the ideal settings
-    model = WhisperModel(MODEL_SIZE, device=DEVICE, compute_type=COMPUTE_TYPE, cpu_threads=THREADS)
+    model = WhisperModel(
+        hw_config["model_size"], 
+        device=hw_config["device"], 
+        compute_type=hw_config["compute_type"], 
+        cpu_threads=hw_config["threads"]
+    )
     print("✅ Faster-Whisper model loaded successfully!")
     
 except ValueError as e:
-    # Fallback: If Colab is set to CPU-only instead of T4 GPU, it will catch the error and fallback gracefully
+    # Graceful Fallback if GPU is detected but drivers are missing/corrupted
     if "cuda" in str(e).lower() or "gpu" in str(e).lower():
-        print("⚠️ CUDA GPU not found! Falling back to fast CPU settings...")
-        DEVICE = "cpu"
-        COMPUTE_TYPE = "int8"
-        model = WhisperModel(MODEL_SIZE, device=DEVICE, compute_type=COMPUTE_TYPE, cpu_threads=THREADS)
+        print("⚠️ GPU drivers missing or failed! Falling back to safe CPU mode...")
+        model = WhisperModel("base", device="cpu", compute_type="int8", cpu_threads=2)
         print("✅ Faster-Whisper model loaded successfully on CPU!")
     else:
-        print(f"❌ Failed to load Faster-Whisper model: {e}")
+        print(f"❌ Failed to load model: {e}")
         model = None
 except Exception as e:
-    print(f"❌ Failed to load Faster-Whisper model: {e}")
+    print(f"❌ Failed to load model: {e}")
     model = None
 
 
 async def ai_detect_audio_language(audio_path: str) -> str:
     """
     Detects the spoken language of an audio file using Faster-Whisper.
-    Returns the full language name (e.g., 'English', 'Hindi').
     """
     if not model:
         print("⚠️ Model not initialized. Skipping detection.")
@@ -68,8 +127,6 @@ async def ai_detect_audio_language(audio_path: str) -> str:
         loop = asyncio.get_running_loop()
         
         def process():
-            # Beam size 1 is the absolute fastest way to transcribe. 
-            # It disables deep searching and just returns the most likely language instantly.
             segments, info = model.transcribe(audio_path, beam_size=1)
             return info
 
@@ -78,14 +135,13 @@ async def ai_detect_audio_language(audio_path: str) -> str:
         lang_code = info.language
         probability = info.language_probability
 
-        # Map 2-letter codes to readable names
         LANG_MAP = {
             "en": "English", "hi": "Hindi", "bn": "Bengali", "ta": "Tamil",
             "te": "Telugu", "ml": "Malayalam", "or": "Odia", "pa": "Punjabi",
             "kn": "Kannada", "gu": "Gujarati", "mr": "Marathi", "ur": "Urdu",
             "zh": "Chinese", "ko": "Korean", "ja": "Japanese", "ar": "Arabic",
             "es": "Spanish", "fr": "French", "ru": "Russian", "pt": "Portuguese",
-            "id": "Indonesian", "de": "German", "it": "Italian", "tr": "Turkish"
+            "id": "Indonesian", "de": "German", "it": "Italian", "tr": "Turkish",
         }
 
         detected_language = LANG_MAP.get(lang_code, lang_code.title())
