@@ -90,10 +90,15 @@ async def stream_handler(request):
                 print(f"⚠️ Stream Write Interrupted: {e}")
             
             return response # Exit cleanly since client disconnected
+            
+        # 🟢 ADD THIS LINE: Return the response if the stream finishes perfectly without errors
+        return response 
         
     except Exception as e:
         print(f"Stream Server Error: {e}")
         return web.Response(status=500, text="Internal Server Error")
+
+        
 
 async def start_web_server(client: Client):
     global tg_client
